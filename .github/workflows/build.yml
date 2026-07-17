@@ -104,26 +104,26 @@ jobs:
 
       - name: Deploy Qt libraries
         run: |
-          cd build/Release
+          cd build/bin/Release
           windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: FireflyPlayer-Windows-x64
-          path: build/Release/
+          path: build/bin/Release/
           retention-days: 7
 
       - name: Zip for release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          cd build
+          cd build/bin
           Compress-Archive -Path Release/* -DestinationPath FireflyPlayer-Windows-x64.zip
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: build/FireflyPlayer-Windows-x64.zip
+          files: build/bin/FireflyPlayer-Windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
