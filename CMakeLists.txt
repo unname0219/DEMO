@@ -16,8 +16,6 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     Multimedia
     MultimediaWidgets
-    Network
-    Svg
 )
 
 set(SOURCES
@@ -83,8 +81,6 @@ target_link_libraries(FireflyPlayer PRIVATE
     Qt6::Widgets
     Qt6::Multimedia
     Qt6::MultimediaWidgets
-    Qt6::Network
-    Qt6::Svg
 )
 
 if(WIN32)
