@@ -12,6 +12,7 @@ MediaViewer::MediaViewer(QWidget* parent)
     , m_videoPlayer(nullptr)
     , m_imageViewer(nullptr)
     , m_placeholderLabel(nullptr)
+    , m_currentType(MediaType::Unknown)
 {
     setupUI();
 }
@@ -32,7 +33,7 @@ void MediaViewer::setupUI()
     m_placeholderLabel->setAlignment(Qt::AlignCenter);
     m_placeholderLabel->setText("拖拽文件到此处或点击打开文件");
     QFont font = m_placeholderLabel->font();
-    font.setPointSizeF(DPIAdapter::scaledFontSize(14));
+    font.setPointSizeF(DPIAdapter::scaledFontSize(11));
     m_placeholderLabel->setFont(font);
     m_placeholderLabel->setStyleSheet("color: #888888;");
     m_stackedLayout->addWidget(m_placeholderLabel);
@@ -48,6 +49,7 @@ void MediaViewer::setupUI()
 
 void MediaViewer::showMedia(const QString& filePath, MediaType type, PlayerController* controller)
 {
+    m_currentType = type;
     switch (type) {
     case MediaType::Video:
     case MediaType::Audio:
@@ -66,7 +68,20 @@ void MediaViewer::showMedia(const QString& filePath, MediaType type, PlayerContr
     }
 }
 
+MediaType MediaViewer::currentMediaType() const
+{
+    return m_currentType;
+}
+
+void MediaViewer::setSmoothScaling(bool smooth)
+{
+    if (m_imageViewer) {
+        m_imageViewer->setSmoothScaling(smooth);
+    }
+}
+
 void MediaViewer::clear()
 {
+    m_currentType = MediaType::Unknown;
     m_stackedLayout->setCurrentWidget(m_placeholderLabel);
 }

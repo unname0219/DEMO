@@ -19,6 +19,8 @@ public:
     void setAudioFormats(const QStringList& formats);
     void setImageFormats(const QStringList& formats);
 
+    void clearAssociations();
+
     void registerAssociations();
     void unregisterAssociations();
 

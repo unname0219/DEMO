@@ -53,6 +53,14 @@ void FileAssociation::setImageFormats(const QStringList& formats)
     saveToSettings();
 }
 
+void FileAssociation::clearAssociations()
+{
+    m_videoFormats.clear();
+    m_audioFormats.clear();
+    m_imageFormats.clear();
+    saveToSettings();
+}
+
 void FileAssociation::registerAssociations()
 {
 }
@@ -77,17 +85,11 @@ void FileAssociation::loadFromSettings()
     QSettings settings;
     settings.beginGroup("fileAssociations");
 
-    m_videoFormats = settings.value("video", QStringList{
-        "mp4", "mkv", "avi", "mov", "webm", "flv"
-    }).toStringList();
-
-    m_audioFormats = settings.value("audio", QStringList{
-        "mp3", "wav", "flac", "aac", "ogg", "m4a"
-    }).toStringList();
-
-    m_imageFormats = settings.value("image", QStringList{
-        "jpg", "jpeg", "png", "gif", "bmp", "webp"
-    }).toStringList();
+    // 默认为空：只有用户明确选择（首次启动点"开始使用"）才会有关联，
+    // 跳过时保持为空，避免"自欺欺人"地显示未真实关联的格式。
+    m_videoFormats = settings.value("video", QStringList{}).toStringList();
+    m_audioFormats = settings.value("audio", QStringList{}).toStringList();
+    m_imageFormats = settings.value("image", QStringList{}).toStringList();
 
     settings.endGroup();
 }

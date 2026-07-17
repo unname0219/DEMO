@@ -21,6 +21,13 @@
 #include <QKeyEvent>
 #include <QMessageBox>
 #include <QShortcut>
+#include <QDir>
+#include <QFileInfo>
+#include <QMouseEvent>
+#include <QWindow>
+#include <QApplication>
+
+static const int kResizeBorder = 6; // 边缘可拉伸区域宽度（像素）
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -32,11 +39,17 @@ MainWindow::MainWindow(QWidget* parent)
     , m_speedSelector(nullptr)
     , m_settingsPanel(nullptr)
     , m_playerController(nullptr)
+    , m_controlBar(nullptr)
     , m_isFullScreen(false)
 {
     m_playerController = new PlayerController(this);
 
+    // 去掉 Windows 原生标题栏，使用自定义标题栏
+    setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
+    setAttribute(Qt::WA_TranslucentBackground, false);
+
     setAcceptDrops(true);
+    setMouseTracking(true);
     setMinimumSize(DPIAdapter::scaledSize(800), DPIAdapter::scaledSize(600));
     resize(DPIAdapter::scaledSize(1024), DPIAdapter::scaledSize(768));
 
@@ -54,6 +67,7 @@ MainWindow::~MainWindow()
 void MainWindow::setupUI()
 {
     QWidget* centralWidget = new QWidget(this);
+    centralWidget->setMouseTracking(true);
     setCentralWidget(centralWidget);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
@@ -69,31 +83,47 @@ void MainWindow::setupUI()
     m_progressBar = new ProgressBar(this);
     mainLayout->addWidget(m_progressBar);
 
-    QWidget* controlBar = new QWidget(this);
-    controlBar->setFixedHeight(DPIAdapter::scaledSize(56));
-    QHBoxLayout* controlLayout = new QHBoxLayout(controlBar);
+    // 控制栏布局：设置 | stretch | 上一个 | 快退 | 播放(居中) | 快进 | 下一个 | stretch | 倍速 | 音量
+    m_controlBar = new QWidget(this);
+    m_controlBar->setFixedHeight(DPIAdapter::scaledSize(52));
+    m_controlBar->setMouseTracking(true);
+    QHBoxLayout* controlLayout = new QHBoxLayout(m_controlBar);
     controlLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(12), 0);
     controlLayout->setSpacing(DPIAdapter::scaledSize(8));
 
-    QPushButton* settingsBtn = new QPushButton("⚙", controlBar);
-    settingsBtn->setFixedSize(DPIAdapter::scaledSize(36), DPIAdapter::scaledSize(36));
+    // 设置按钮（居左）
+    QPushButton* settingsBtn = new QPushButton("⚙", m_controlBar);
+    settingsBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
+    settingsBtn->setCursor(Qt::PointingHandCursor);
+    settingsBtn->setToolTip("设置");
+    QFont gearFont = settingsBtn->font();
+    gearFont.setPointSizeF(DPIAdapter::scaledFontSize(13));
+    settingsBtn->setFont(gearFont);
     connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::toggleSettings);
     controlLayout->addWidget(settingsBtn);
 
-    m_playbackControls = new PlaybackControls(controlBar);
-    controlLayout->addWidget(m_playbackControls);
-
+    // 左侧弹性，把播放控制组推到中间
     controlLayout->addStretch();
 
-    m_speedSelector = new SpeedSelector(controlBar);
+    m_playbackControls = new PlaybackControls(m_controlBar);
+    controlLayout->addWidget(m_playbackControls);
+
+    // 右侧弹性，让倍速/音量靠右
+    controlLayout->addStretch();
+
+    m_speedSelector = new SpeedSelector(m_controlBar);
     controlLayout->addWidget(m_speedSelector);
 
-    m_volumeSlider = new VolumeSlider(controlBar);
+    m_volumeSlider = new VolumeSlider(m_controlBar);
     controlLayout->addWidget(m_volumeSlider);
 
-    mainLayout->addWidget(controlBar);
+    mainLayout->addWidget(m_controlBar);
 
+    // 设置面板：作为独立的顶层 Tool 窗口（以主窗口为 owner），
+    // 避免被视频原生渲染层遮挡，同时跟随主窗口最小化/关闭。
     m_settingsPanel = new SettingsPanel(this);
+    m_settingsPanel->setWindowFlag(Qt::Tool, true);
+    m_settingsPanel->setWindowFlag(Qt::FramelessWindowHint, true);
     m_settingsPanel->setVisible(false);
 }
 
@@ -108,10 +138,16 @@ void MainWindow::setupConnections()
 
     connect(m_playbackControls, &PlaybackControls::playToggled,
             m_playerController, &PlayerController::togglePlayPause);
-    connect(m_playbackControls, &PlaybackControls::previousClicked,
+    // 快退/快进 → 进度跳转
+    connect(m_playbackControls, &PlaybackControls::rewindClicked,
             m_playerController, [this]() { m_playerController->seekBackward(10); });
-    connect(m_playbackControls, &PlaybackControls::nextClicked,
+    connect(m_playbackControls, &PlaybackControls::forwardClicked,
             m_playerController, [this]() { m_playerController->seekForward(10); });
+    // 上一个/下一个 → 切换文件
+    connect(m_playbackControls, &PlaybackControls::previousClicked,
+            this, [this]() { playAdjacentFile(-1); });
+    connect(m_playbackControls, &PlaybackControls::nextClicked,
+            this, [this]() { playAdjacentFile(1); });
 
     connect(m_playerController, &PlayerController::playbackStateChanged,
             m_playbackControls, &PlaybackControls::onPlaybackStateChanged);
@@ -138,6 +174,10 @@ void MainWindow::setupConnections()
 
     connect(m_playerController, &PlayerController::volumeBoostRequested,
             this, &MainWindow::onVolumeBoostRequested);
+
+    // 图片缩放模式立即生效
+    connect(m_settingsPanel, &SettingsPanel::imageScalingChanged,
+            m_mediaViewer, &MediaViewer::setSmoothScaling);
 
     connect(ThemeManager::instance(), &ThemeManager::themeChanged,
             this, [this]() { update(); });
@@ -216,6 +256,17 @@ void MainWindow::openFile(const QString& filePath)
     updateWindowTitle(QFileInfo(filePath).fileName());
 
     m_mediaViewer->showMedia(filePath, type, m_playerController);
+    updateLayoutForMediaType(type);
+}
+
+void MainWindow::updateLayoutForMediaType(MediaType type)
+{
+    // 图片模式下隐藏进度条与播放控制（图片不需要进度条和播放控制）
+    bool isImage = (type == MediaType::Image);
+    m_progressBar->setVisible(!isImage);
+    m_playbackControls->setVisible(!isImage);
+    m_speedSelector->setVisible(!isImage);
+    m_volumeSlider->setVisible(!isImage);
 }
 
 void MainWindow::toggleSettings()
@@ -223,15 +274,23 @@ void MainWindow::toggleSettings()
     if (m_settingsPanel->isVisible()) {
         m_settingsPanel->hide();
     } else {
-        m_settingsPanel->setParent(this);
-        m_settingsPanel->setGeometry(
-            DPIAdapter::scaledSize(20),
-            m_headerBar->height() + DPIAdapter::scaledSize(10),
-            DPIAdapter::scaledSize(400),
-            height() - m_headerBar->height() - DPIAdapter::scaledSize(80)
-        );
+        repositionSettingsPanel();
         m_settingsPanel->show();
+        m_settingsPanel->raise();
+        m_settingsPanel->activateWindow();
     }
+}
+
+void MainWindow::repositionSettingsPanel()
+{
+    if (!m_settingsPanel) return;
+    int w = DPIAdapter::scaledSize(380);
+    int h = height() - m_headerBar->height() - DPIAdapter::scaledSize(70);
+    if (h < DPIAdapter::scaledSize(300)) h = DPIAdapter::scaledSize(300);
+    // 相对主窗口左上角定位（全局坐标）
+    QPoint topLeft = mapToGlobal(QPoint(DPIAdapter::scaledSize(16),
+                                        m_headerBar->height() + DPIAdapter::scaledSize(8)));
+    m_settingsPanel->setGeometry(topLeft.x(), topLeft.y(), w, h);
 }
 
 void MainWindow::toggleFullScreen()
@@ -259,6 +318,48 @@ void MainWindow::onVolumeBoostRequested()
     if (reply == QMessageBox::Yes) {
         m_playerController->setVolumeBoostEnabled(true);
     }
+}
+
+void MainWindow::playAdjacentFile(int direction)
+{
+    if (m_currentFile.isEmpty()) return;
+
+    // 图片模式交给 ImageViewer 自身处理同目录切换
+    if (m_mediaViewer->currentMediaType() == MediaType::Image) {
+        if (direction < 0) {
+            // 通过快捷键触发；这里复用文件级查找兜底
+        }
+        return;
+    }
+
+    QString next = findAdjacentFile(m_currentFile, direction);
+    if (!next.isEmpty()) {
+        openFile(next);
+    }
+}
+
+QString MainWindow::findAdjacentFile(const QString& currentPath, int direction)
+{
+    QFileInfo currentFi(currentPath);
+    QDir dir = currentFi.dir();
+    QStringList files = dir.entryList(QDir::Files, QDir::Name);
+
+    // 仅保留通过文件头识别为媒体文件的项
+    QStringList mediaFiles;
+    foreach (const QString& name, files) {
+        QString full = dir.filePath(name);
+        MediaType t = FileSignatureDetector::detectMediaType(full);
+        if (t == MediaType::Video || t == MediaType::Audio) {
+            mediaFiles.append(full);
+        }
+    }
+
+    int idx = mediaFiles.indexOf(currentFi.absoluteFilePath());
+    if (idx < 0) return QString();
+
+    int nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= mediaFiles.size()) return QString();
+    return mediaFiles[nextIdx];
 }
 
 void MainWindow::updateWindowTitle(const QString& fileName)
@@ -299,8 +400,57 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
     if (m_settingsPanel && m_settingsPanel->isVisible()) {
-        m_settingsPanel->setFixedHeight(
-            height() - m_headerBar->height() - DPIAdapter::scaledSize(80)
-        );
+        repositionSettingsPanel();
     }
+}
+
+void MainWindow::moveEvent(QMoveEvent* event)
+{
+    QMainWindow::moveEvent(event);
+    if (m_settingsPanel && m_settingsPanel->isVisible()) {
+        repositionSettingsPanel();
+    }
+}
+
+// 无边框窗口的边缘拉伸：检测鼠标是否在窗口边缘，触发系统级缩放
+void MainWindow::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && !isMaximized() && !m_isFullScreen) {
+        QWindow* w = windowHandle();
+        if (w) {
+            int x = event->position().x();
+            int y = event->position().y();
+            int bw = kResizeBorder;
+            Qt::Edges edges;
+            if (x < bw) edges |= Qt::LeftEdge;
+            if (x > width() - bw) edges |= Qt::RightEdge;
+            if (y < bw) edges |= Qt::TopEdge;
+            if (y > height() - bw) edges |= Qt::BottomEdge;
+            if (edges) {
+                w->startSystemResize(edges);
+                return;
+            }
+        }
+    }
+    QMainWindow::mousePressEvent(event);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent* event)
+{
+    // 在边缘显示对应的缩放光标
+    if (!isMaximized() && !m_isFullScreen) {
+        int x = event->position().x();
+        int y = event->position().y();
+        int bw = kResizeBorder;
+        bool left = x < bw;
+        bool right = x > width() - bw;
+        bool top = y < bw;
+        bool bottom = y > height() - bw;
+        if ((left && top) || (right && bottom)) setCursor(Qt::SizeFDiagCursor);
+        else if ((right && top) || (left && bottom)) setCursor(Qt::SizeBDiagCursor);
+        else if (left || right) setCursor(Qt::SizeHorCursor);
+        else if (top || bottom) setCursor(Qt::SizeVerCursor);
+        else setCursor(Qt::ArrowCursor);
+    }
+    QMainWindow::mouseMoveEvent(event);
 }

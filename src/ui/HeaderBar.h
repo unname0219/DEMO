@@ -27,6 +27,7 @@ private:
 
     QLabel* m_logoLabel;
     QLabel* m_titleLabel;
+    QPushButton* m_openFileBtn;
     QPushButton* m_minimizeBtn;
     QPushButton* m_maximizeBtn;
     QPushButton* m_closeBtn;
@@ -34,6 +35,8 @@ private:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseDoubleClickEvent(QMouseEvent* event) override;
 };
 
 #endif

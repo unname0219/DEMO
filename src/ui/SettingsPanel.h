@@ -13,6 +13,10 @@ public:
     explicit SettingsPanel(QWidget* parent = nullptr);
     ~SettingsPanel();
 
+signals:
+    // 图片缩放模式改变时立即发出，由 ImageViewer 实时响应（无需重启）
+    void imageScalingChanged(bool smooth);
+
 private slots:
     void onCategoryChanged(int row);
 

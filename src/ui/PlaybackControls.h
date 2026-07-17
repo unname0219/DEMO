@@ -17,6 +17,8 @@ signals:
     void playToggled();
     void previousClicked();
     void nextClicked();
+    void rewindClicked();
+    void forwardClicked();
 
 public slots:
     void onPlaybackStateChanged(PlaybackState state);
@@ -27,6 +29,8 @@ private:
     QPushButton* m_playPauseBtn;
     QPushButton* m_prevBtn;
     QPushButton* m_nextBtn;
+    QPushButton* m_rewindBtn;
+    QPushButton* m_forwardBtn;
     PlaybackState m_state;
 };
 

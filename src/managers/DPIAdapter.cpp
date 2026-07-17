@@ -15,8 +15,9 @@ void DPIAdapter::applyGlobalSettings()
 
     calculateScales();
 
+    // 基础字号 9pt，避免与 DPI 缩放叠加后过大
     QFont font = QApplication::font();
-    font.setPointSizeF(scaledFontSize(10));
+    font.setPointSizeF(scaledFontSize(9));
     QApplication::setFont(font);
 }
 
@@ -32,21 +33,23 @@ void DPIAdapter::calculateScales()
     qreal logicalDpi = screen->logicalDotsPerInch();
     qreal dpiRatio = logicalDpi / 96.0;
 
+    // 控件尺寸可以放大更多，但字体缩放幅度必须收敛，
+    // 否则在高分屏上会出现"字体过大、设置面板变形"的问题。
     if (dpiRatio <= 1.0) {
         s_dpiScale = 1.0;
         s_fontScale = 1.0;
+    } else if (dpiRatio <= 1.25) {
+        s_dpiScale = 1.1;
+        s_fontScale = 1.05;
     } else if (dpiRatio <= 1.5) {
         s_dpiScale = 1.25;
-        s_fontScale = 1.15;
+        s_fontScale = 1.1;
     } else if (dpiRatio <= 2.0) {
         s_dpiScale = 1.5;
-        s_fontScale = 1.3;
-    } else if (dpiRatio <= 2.5) {
-        s_dpiScale = 2.0;
-        s_fontScale = 1.5;
+        s_fontScale = 1.15;
     } else {
-        s_dpiScale = 2.5;
-        s_fontScale = 1.7;
+        s_dpiScale = 1.75;
+        s_fontScale = 1.2;
     }
 }
 
@@ -80,5 +83,5 @@ void DPIAdapter::adjustWidgetFont(QWidget* widget, int basePt)
 
 int DPIAdapter::minimumFontSize()
 {
-    return 11;
+    return 8;
 }

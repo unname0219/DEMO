@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include "core/PlayerController.h"
+#include "core/FileSignatureDetector.h"
 
 class HeaderBar;
 class MediaViewer;
@@ -25,6 +26,9 @@ protected:
     void dropEvent(QDropEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void moveEvent(QMoveEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
 
 private slots:
     void openFileDialog();
@@ -32,12 +36,16 @@ private slots:
     void toggleSettings();
     void toggleFullScreen();
     void onVolumeBoostRequested();
+    void playAdjacentFile(int direction);
 
 private:
     void setupUI();
     void setupConnections();
     void setupShortcuts();
     void updateWindowTitle(const QString& fileName);
+    void updateLayoutForMediaType(MediaType type);
+    void repositionSettingsPanel();
+    QString findAdjacentFile(const QString& currentPath, int direction);
 
     HeaderBar* m_headerBar;
     MediaViewer* m_mediaViewer;
@@ -47,6 +55,8 @@ private:
     SpeedSelector* m_speedSelector;
     SettingsPanel* m_settingsPanel;
     PlayerController* m_playerController;
+
+    QWidget* m_controlBar;
 
     QString m_currentFile;
     bool m_isFullScreen;
