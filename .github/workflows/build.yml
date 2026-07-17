@@ -1,0 +1,129 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  build-linux:
+    name: Build on Linux (x64)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.3'
+          host: 'linux'
+          target: 'desktop'
+          arch: 'gcc_64'
+          modules: 'qtmultimedia qtsvg'
+          cache: 'true'
+
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release -j$(nproc)
+
+      - name: Package (AppImage)
+        run: |
+          cd build
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 file
+          mkdir -p AppDir/usr/bin
+          cp bin/FireflyPlayer AppDir/usr/bin/
+          wget -c "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage"
+          chmod +x linuxdeploy-x86_64.AppImage
+          export QMAKE=$Qt6_DIR/bin/qmake
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage || true
+          ls -la *.AppImage 2>/dev/null || echo "AppImage creation failed, uploading binary directly"
+        continue-on-error: true
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FireflyPlayer-Linux-x64
+          path: |
+            build/bin/FireflyPlayer
+            build/*.AppImage
+          retention-days: 7
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/bin/FireflyPlayer
+            build/*.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    name: Build on Windows (x64)
+    runs-on: windows-2022
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Qt6
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          modules: 'qtmultimedia qtsvg'
+          cache: 'true'
+
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config Release
+
+      - name: Deploy Qt libraries
+        run: |
+          cd build/Release
+          windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FireflyPlayer-Windows-x64
+          path: build/Release/
+          retention-days: 7
+
+      - name: Zip for release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd build
+          Compress-Archive -Path Release/* -DestinationPath FireflyPlayer-Windows-x64.zip
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/FireflyPlayer-Windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
