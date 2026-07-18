@@ -21,6 +21,9 @@ signals:
     void maximizeClicked();
     void closeClicked();
 
+private slots:
+    void refreshIcons();
+
 private:
     void setupUI();
     void updateTitleElided();

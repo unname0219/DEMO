@@ -23,6 +23,9 @@ signals:
 public slots:
     void onPlaybackStateChanged(PlaybackState state);
 
+private slots:
+    void refreshIcons();
+
 private:
     void setupUI();
 

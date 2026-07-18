@@ -3,6 +3,7 @@
 #include "managers/FileAssociation.h"
 #include "managers/PluginManager.h"
 #include "managers/DPIAdapter.h"
+#include "managers/IconManager.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>

@@ -1,10 +1,13 @@
 #include "ui/HeaderBar.h"
 #include "managers/DPIAdapter.h"
+#include "managers/IconManager.h"
+#include "managers/ThemeManager.h"
 #include <QHBoxLayout>
 #include <QFontMetrics>
 #include <QResizeEvent>
 #include <QMouseEvent>
 #include <QWindow>
+#include <QIcon>
 
 HeaderBar::HeaderBar(QWidget* parent)
     : QWidget(parent)
@@ -19,6 +22,7 @@ HeaderBar::HeaderBar(QWidget* parent)
     setFixedHeight(DPIAdapter::scaledSize(40));
     setMouseTracking(true);
     setupUI();
+    refreshIcons();
 }
 
 HeaderBar::~HeaderBar()
@@ -31,15 +35,26 @@ void HeaderBar::setupUI()
     layout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(4), 0);
     layout->setSpacing(DPIAdapter::scaledSize(8));
 
-    m_logoLabel = new QLabel("🔥 Firefly", this);
-    QFont logoFont = m_logoLabel->font();
-    logoFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
-    logoFont.setBold(true);
-    m_logoLabel->setFont(logoFont);
-    m_logoLabel->setStyleSheet("color: #00D4AA; background: transparent;");
+    // Logo 图标（保留原色，不染色）
+    int logoSize = DPIAdapter::scaledSize(24);
+    m_logoLabel = new QLabel(this);
+    m_logoLabel->setFixedSize(logoSize, logoSize);
+    m_logoLabel->setScaledContents(true);
     layout->addWidget(m_logoLabel);
 
-    m_openFileBtn = new QPushButton("打开文件", this);
+    // 品牌名
+    QLabel* brandLabel = new QLabel("Firefly", this);
+    QFont brandFont = brandLabel->font();
+    brandFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
+    brandFont.setBold(true);
+    brandLabel->setFont(brandFont);
+    brandLabel->setStyleSheet("color: #00D4AA; background: transparent;");
+    layout->addWidget(brandLabel);
+
+    m_openFileBtn = new QPushButton(this);
+    int btnIconSize = DPIAdapter::scaledSize(16);
+    m_openFileBtn->setIconSize(QSize(btnIconSize, btnIconSize));
+    m_openFileBtn->setText("打开文件");
     QFont openFont = m_openFileBtn->font();
     openFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
     m_openFileBtn->setFont(openFont);
@@ -63,31 +78,48 @@ void HeaderBar::setupUI()
 
     layout->addStretch();
 
-    m_minimizeBtn = new QPushButton("—", this);
-    m_minimizeBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(28));
-    QFont btnFont = m_minimizeBtn->font();
-    btnFont.setPointSizeF(DPIAdapter::scaledFontSize(10));
-    m_minimizeBtn->setFont(btnFont);
+    // 窗口控制按钮（图标化）
+    int winBtnW = DPIAdapter::scaledSize(34);
+    int winBtnH = DPIAdapter::scaledSize(28);
+    int winIconSize = DPIAdapter::scaledSize(14);
+
+    m_minimizeBtn = new QPushButton(this);
+    m_minimizeBtn->setFixedSize(winBtnW, winBtnH);
+    m_minimizeBtn->setIconSize(QSize(winIconSize, winIconSize));
     m_minimizeBtn->setCursor(Qt::PointingHandCursor);
     connect(m_minimizeBtn, &QPushButton::clicked, this, &HeaderBar::minimizeClicked);
     layout->addWidget(m_minimizeBtn);
 
-    m_maximizeBtn = new QPushButton("□", this);
-    m_maximizeBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(28));
-    m_maximizeBtn->setFont(btnFont);
+    m_maximizeBtn = new QPushButton(this);
+    m_maximizeBtn->setFixedSize(winBtnW, winBtnH);
+    m_maximizeBtn->setIconSize(QSize(winIconSize, winIconSize));
     m_maximizeBtn->setCursor(Qt::PointingHandCursor);
     connect(m_maximizeBtn, &QPushButton::clicked, this, &HeaderBar::maximizeClicked);
     layout->addWidget(m_maximizeBtn);
 
-    m_closeBtn = new QPushButton("×", this);
-    m_closeBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(28));
-    m_closeBtn->setFont(btnFont);
+    m_closeBtn = new QPushButton(this);
+    m_closeBtn->setFixedSize(winBtnW, winBtnH);
+    m_closeBtn->setIconSize(QSize(winIconSize, winIconSize));
     m_closeBtn->setCursor(Qt::PointingHandCursor);
     m_closeBtn->setStyleSheet(
         "QPushButton:hover { background-color: #E81123; color: white; }"
     );
     connect(m_closeBtn, &QPushButton::clicked, this, &HeaderBar::closeClicked);
     layout->addWidget(m_closeBtn);
+
+    // 主题变化时刷新图标
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, &HeaderBar::refreshIcons);
+}
+
+void HeaderBar::refreshIcons()
+{
+    // Logo 保留原色
+    m_logoLabel->setPixmap(IconManager::instance()->icon("logo", false).pixmap(m_logoLabel->size()));
+    m_openFileBtn->setIcon(IconManager::instance()->icon("open-file"));
+    m_minimizeBtn->setIcon(IconManager::instance()->icon("minimize"));
+    m_maximizeBtn->setIcon(IconManager::instance()->icon("maximize"));
+    m_closeBtn->setIcon(IconManager::instance()->icon("close"));
 }
 
 void HeaderBar::setTitle(const QString& title)
@@ -112,7 +144,6 @@ void HeaderBar::resizeEvent(QResizeEvent* event)
     updateTitleElided();
 }
 
-// 无边框窗口：在标题栏按下左键拖动整个窗口
 void HeaderBar::mousePressEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {
@@ -124,7 +155,6 @@ void HeaderBar::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
-// 双击标题栏最大化/还原
 void HeaderBar::mouseDoubleClickEvent(QMouseEvent* event)
 {
     if (event->button() == Qt::LeftButton) {

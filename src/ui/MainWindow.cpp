@@ -9,6 +9,7 @@
 #include "core/FileSignatureDetector.h"
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
+#include "managers/IconManager.h"
 #include "utils/FormatUtils.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -91,15 +92,18 @@ void MainWindow::setupUI()
     controlLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(12), 0);
     controlLayout->setSpacing(DPIAdapter::scaledSize(8));
 
-    // 设置按钮（居左）
-    QPushButton* settingsBtn = new QPushButton("⚙", m_controlBar);
+    // 设置按钮（居左，图标化）
+    QPushButton* settingsBtn = new QPushButton(m_controlBar);
     settingsBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
+    settingsBtn->setIconSize(QSize(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(20)));
+    settingsBtn->setIcon(IconManager::instance()->icon("settings"));
     settingsBtn->setCursor(Qt::PointingHandCursor);
     settingsBtn->setToolTip("设置");
-    QFont gearFont = settingsBtn->font();
-    gearFont.setPointSizeF(DPIAdapter::scaledFontSize(13));
-    settingsBtn->setFont(gearFont);
     connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::toggleSettings);
+    // 主题变化时刷新设置按钮图标
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, [settingsBtn]() {
+        settingsBtn->setIcon(IconManager::instance()->icon("settings"));
+    });
     controlLayout->addWidget(settingsBtn);
 
     // 左侧弹性，把播放控制组推到中间

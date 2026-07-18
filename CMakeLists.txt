@@ -14,6 +14,7 @@ find_package(Qt6 REQUIRED COMPONENTS
     Core
     Gui
     Widgets
+    Svg
     Multimedia
     MultimediaWidgets
 )
@@ -37,6 +38,7 @@ set(SOURCES
     src/managers/DPIAdapter.cpp
     src/managers/FileAssociation.cpp
     src/managers/PluginManager.cpp
+    src/managers/IconManager.cpp
     src/utils/FormatUtils.cpp
 )
 
@@ -58,6 +60,7 @@ set(HEADERS
     src/managers/DPIAdapter.h
     src/managers/FileAssociation.h
     src/managers/PluginManager.h
+    src/managers/IconManager.h
     src/utils/FormatUtils.h
 )
 
@@ -79,6 +82,7 @@ target_link_libraries(FireflyPlayer PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
+    Qt6::Svg
     Qt6::Multimedia
     Qt6::MultimediaWidgets
 )

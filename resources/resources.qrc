@@ -1,4 +1,21 @@
 <RCC>
-    <qresource prefix="/">
+    <qresource prefix="/icons">
+        <file alias="logo.svg">icons/logo.svg</file>
+        <file alias="open-file.svg">icons/open-file.svg</file>
+        <file alias="minimize.svg">icons/minimize.svg</file>
+        <file alias="maximize.svg">icons/maximize.svg</file>
+        <file alias="restore.svg">icons/restore.svg</file>
+        <file alias="close.svg">icons/close.svg</file>
+        <file alias="play.svg">icons/play.svg</file>
+        <file alias="pause.svg">icons/pause.svg</file>
+        <file alias="skip-back.svg">icons/skip-back.svg</file>
+        <file alias="skip-forward.svg">icons/skip-forward.svg</file>
+        <file alias="rewind.svg">icons/rewind.svg</file>
+        <file alias="forward.svg">icons/forward.svg</file>
+        <file alias="settings.svg">icons/settings.svg</file>
+        <file alias="volume.svg">icons/volume.svg</file>
+        <file alias="volume-mute.svg">icons/volume-mute.svg</file>
+        <file alias="sun.svg">icons/sun.svg</file>
+        <file alias="moon.svg">icons/moon.svg</file>
     </qresource>
 </RCC>
