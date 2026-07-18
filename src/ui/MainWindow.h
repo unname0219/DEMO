@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QTimer>
+#include <QPropertyAnimation>
 #include "core/PlayerController.h"
 #include "core/FileSignatureDetector.h"
 
@@ -71,6 +72,8 @@ private:
 
     QWidget* m_controlBar;
     QTimer* m_hideControlsTimer;
+    QPropertyAnimation* m_controlBarAnimation;
+    QPropertyAnimation* m_progressBarAnimation;
 
     QString m_currentFile;
     bool m_isFullScreen;

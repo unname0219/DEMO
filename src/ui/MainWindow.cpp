@@ -48,6 +48,8 @@ MainWindow::MainWindow(QWidget* parent)
     , m_playerController(nullptr)
     , m_controlBar(nullptr)
     , m_hideControlsTimer(nullptr)
+    , m_controlBarAnimation(nullptr)
+    , m_progressBarAnimation(nullptr)
     , m_isFullScreen(false)
 {
     m_playerController = new PlayerController(this);
@@ -55,6 +57,14 @@ MainWindow::MainWindow(QWidget* parent)
     m_hideControlsTimer->setInterval(1000);
     m_hideControlsTimer->setSingleShot(true);
     connect(m_hideControlsTimer, &QTimer::timeout, this, &MainWindow::hideControlsAfterTimeout);
+
+    m_controlBarAnimation = new QPropertyAnimation(this);
+    m_controlBarAnimation->setDuration(300);
+    m_controlBarAnimation->setPropertyName("pos");
+
+    m_progressBarAnimation = new QPropertyAnimation(this);
+    m_progressBarAnimation->setDuration(300);
+    m_progressBarAnimation->setPropertyName("pos");
 
     // 去掉 Windows 原生标题栏，使用自定义标题栏
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -356,38 +366,113 @@ void MainWindow::toggleFullScreen()
         m_controlBar->show();
         m_controlBar->setStyleSheet("");
         m_progressBar->setStyleSheet("");
+
+        // 恢复控件到布局中
+        QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
+        if (mainLayout) {
+            mainLayout->insertWidget(2, m_progressBar);
+            mainLayout->insertWidget(3, m_controlBar);
+        }
+
         m_isFullScreen = false;
     } else {
         setContentsMargins(0, 0, 0, 0);
         showFullScreen();
         m_headerBar->hide();
-        m_progressBar->hide();
-        m_controlBar->hide();
+
+        // 从布局中移除控件，改为绝对定位浮动
+        QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
+        if (mainLayout) {
+            mainLayout->removeWidget(m_progressBar);
+            mainLayout->removeWidget(m_controlBar);
+        }
+
+        int ctrlH = DPIAdapter::scaledSize(52);
+        int progH = DPIAdapter::scaledSize(20);
+        int w = width();
+        int h = height();
+
+        m_progressBar->setParent(centralWidget());
+        m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
+        m_progressBar->setStyleSheet("QWidget { background-color: rgba(0,0,0,0.5); }");
+        m_progressBar->show();
+        m_progressBar->raise();
+
+        m_controlBar->setParent(centralWidget());
+        m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
+        m_controlBar->setStyleSheet(
+            "QWidget#controlBar { background-color: rgba(0,0,0,0.5); }"
+            "QPushButton { background-color: transparent; }"
+        );
+        m_controlBar->setObjectName("controlBar");
+        m_controlBar->show();
+        m_controlBar->raise();
+
         m_isFullScreen = true;
+        m_hideControlsTimer->start();
     }
 }
 
 void MainWindow::showControls()
 {
     if (!m_isFullScreen) return;
-    m_headerBar->show();
-    m_progressBar->show();
-    m_controlBar->show();
-    m_controlBar->setStyleSheet(
-        "QWidget { background-color: rgba(0,0,0,0.6); }"
-        "QPushButton { background-color: transparent; }"
-    );
-    m_progressBar->setStyleSheet("QWidget { background-color: rgba(0,0,0,0.6); }");
     m_hideControlsTimer->stop();
+
+    int ctrlH = DPIAdapter::scaledSize(52);
+    int progH = DPIAdapter::scaledSize(20);
+    int w = width();
+    int h = height();
+
+    // 动画：进度条从底部滑入
+    QPoint progTarget(0, h - ctrlH - progH);
+    if (m_progressBar->pos().y() >= h) {
+        m_progressBar->move(0, h);
+        m_progressBar->show();
+        m_progressBar->raise();
+    }
+    m_progressBarAnimation->setTargetObject(m_progressBar);
+    m_progressBarAnimation->setPropertyName("pos");
+    m_progressBarAnimation->setStartValue(m_progressBar->pos());
+    m_progressBarAnimation->setEndValue(progTarget);
+    m_progressBarAnimation->start();
+
+    // 动画：控制栏从底部滑入
+    QPoint ctrlTarget(0, h - ctrlH);
+    if (m_controlBar->pos().y() >= h) {
+        m_controlBar->move(0, h);
+        m_controlBar->show();
+        m_controlBar->raise();
+    }
+    m_controlBarAnimation->setTargetObject(m_controlBar);
+    m_controlBarAnimation->setPropertyName("pos");
+    m_controlBarAnimation->setStartValue(m_controlBar->pos());
+    m_controlBarAnimation->setEndValue(ctrlTarget);
+    m_controlBarAnimation->start();
+
     m_hideControlsTimer->start();
 }
 
 void MainWindow::hideControls()
 {
     if (!m_isFullScreen) return;
-    m_headerBar->hide();
-    m_progressBar->hide();
-    m_controlBar->hide();
+
+    int h = height();
+
+    // 动画：进度条向下滑出
+    QPoint progTarget(0, h);
+    m_progressBarAnimation->setTargetObject(m_progressBar);
+    m_progressBarAnimation->setPropertyName("pos");
+    m_progressBarAnimation->setStartValue(m_progressBar->pos());
+    m_progressBarAnimation->setEndValue(progTarget);
+    m_progressBarAnimation->start();
+
+    // 动画：控制栏向下滑出
+    QPoint ctrlTarget(0, h);
+    m_controlBarAnimation->setTargetObject(m_controlBar);
+    m_controlBarAnimation->setPropertyName("pos");
+    m_controlBarAnimation->setStartValue(m_controlBar->pos());
+    m_controlBarAnimation->setEndValue(ctrlTarget);
+    m_controlBarAnimation->start();
 }
 
 void MainWindow::hideControlsAfterTimeout()
@@ -492,6 +577,15 @@ void MainWindow::resizeEvent(QResizeEvent* event)
         m_settingsPanel->move((width() - m_settingsPanel->width()) / 2,
                               (height() - m_settingsPanel->height()) / 2);
     }
+    // 全屏下更新浮动控件位置
+    if (m_isFullScreen && m_progressBar && m_controlBar) {
+        int ctrlH = m_controlBar->height();
+        int progH = m_progressBar->height();
+        int w = width();
+        int h = height();
+        m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
+        m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
+    }
 }
 
 void MainWindow::moveEvent(QMoveEvent* event)
@@ -550,6 +644,10 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
         updateResizeCursor(localPos.x(), localPos.y());
         return true;
     }
+    if (event->type() == QEvent::MouseMove && m_isFullScreen) {
+        showControls();
+        return false;
+    }
     if (event->type() == QEvent::MouseButtonPress && !isMaximized() && !m_isFullScreen) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
         if (mouseEvent->button() == Qt::LeftButton) {
@@ -596,7 +694,6 @@ void MainWindow::mouseMoveEvent(QMouseEvent* event)
     }
     if (m_isFullScreen) {
         showControls();
-        m_hideControlsTimer->start();
     }
     QMainWindow::mouseMoveEvent(event);
 }
