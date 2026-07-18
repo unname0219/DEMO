@@ -40,10 +40,7 @@ void ProgressBar::setupUI()
     m_slider->setTracking(false);
     connect(m_slider, &QSlider::sliderMoved, this, &ProgressBar::onSliderMoved);
     connect(m_slider, &QSlider::sliderReleased, this, &ProgressBar::onSliderReleased);
-    connect(m_slider, &QSlider::actionTriggered, this, [this](int action) {
-        Q_UNUSED(action);
-        m_isSeeking = true;
-    });
+    connect(m_slider, &QSlider::valueChanged, this, &ProgressBar::onValueChanged);
     layout->addWidget(m_slider, 1);
 
     m_durationLabel = new QLabel("00:00", this);
@@ -51,6 +48,18 @@ void ProgressBar::setupUI()
     m_durationLabel->setFixedWidth(DPIAdapter::scaledSize(56));
     m_durationLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(m_durationLabel);
+}
+
+void ProgressBar::onValueChanged(int value)
+{
+    if (!m_isSeeking) {
+        return;
+    }
+    if (m_duration > 0) {
+        qint64 newPos = (value * m_duration) / 1000;
+        m_timeLabel->setText(FormatUtils::formatTime(newPos));
+        emit seekRequested(newPos);
+    }
 }
 
 void ProgressBar::onPositionChanged(qint64 position)
@@ -79,16 +88,13 @@ void ProgressBar::onSliderMoved(int value)
     if (m_duration > 0) {
         qint64 newPos = (value * m_duration) / 1000;
         m_timeLabel->setText(FormatUtils::formatTime(newPos));
+        emit seekRequested(newPos);
     }
 }
 
 void ProgressBar::onSliderReleased()
 {
     m_isSeeking = false;
-    if (m_duration > 0) {
-        qint64 newPos = (m_slider->value() * m_duration) / 1000;
-        emit seekRequested(newPos);
-    }
 }
 
 void ProgressBar::updatePositionLabel()

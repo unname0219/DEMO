@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QTimer>
 #include "core/PlayerController.h"
 #include "core/FileSignatureDetector.h"
 
@@ -29,6 +30,7 @@ protected:
     void moveEvent(QMoveEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void changeEvent(QEvent* event) override;
     bool eventFilter(QObject* obj, QEvent* event) override;
@@ -40,6 +42,7 @@ private slots:
     void toggleFullScreen();
     void onVolumeBoostRequested();
     void playAdjacentFile(int direction);
+    void hideControlsAfterTimeout();
 
 private:
     void setupUI();
@@ -50,6 +53,9 @@ private:
     void repositionSettingsPanel();
     QString findAdjacentFile(const QString& currentPath, int direction);
     void updateResizeCursor(int x, int y);
+    void showControls();
+    void hideControls();
+    void showFileInfoMenu(const QPoint& pos);
 
     HeaderBar* m_headerBar;
     MediaViewer* m_mediaViewer;
@@ -61,6 +67,7 @@ private:
     PlayerController* m_playerController;
 
     QWidget* m_controlBar;
+    QTimer* m_hideControlsTimer;
 
     QString m_currentFile;
     bool m_isFullScreen;

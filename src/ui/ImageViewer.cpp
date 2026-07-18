@@ -18,6 +18,8 @@ ImageViewer::ImageViewer(QWidget* parent)
     , m_scaleFactor(1.0)
     , m_smoothScaling(true)
     , m_currentIndex(0)
+    , m_isDragging(false)
+    , m_imageOffset(QPoint(0, 0))
 {
     QSettings settings;
     m_smoothScaling = settings.value("image/smoothScaling", true).toBool();
@@ -99,10 +101,11 @@ void ImageViewer::updateDisplay()
         ? Qt::SmoothTransformation
         : Qt::FastTransformation;
 
-    QPixmap scaled = QPixmap::fromImage(
-        m_originalImage.scaled(newWidth, newHeight, Qt::KeepAspectRatio, mode)
-    );
+    QImage scaledImage = m_originalImage.scaled(newWidth, newHeight, Qt::KeepAspectRatio, mode);
+    QPixmap scaled = QPixmap::fromImage(scaledImage);
     m_imageLabel->setPixmap(scaled);
+    m_imageLabel->setAlignment(Qt::AlignCenter);
+    m_imageLabel->setGeometry(m_imageOffset.x(), m_imageOffset.y(), width(), height());
 }
 
 void ImageViewer::updateNavButtons()
@@ -177,4 +180,34 @@ void ImageViewer::resizeEvent(QResizeEvent* event)
 void ImageViewer::keyPressEvent(QKeyEvent* event)
 {
     QWidget::keyPressEvent(event);
+}
+
+void ImageViewer::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && m_scaleFactor > 1.0) {
+        m_isDragging = true;
+        m_lastMousePos = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+    }
+    QWidget::mousePressEvent(event);
+}
+
+void ImageViewer::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_isDragging) {
+        QPoint delta = event->pos() - m_lastMousePos;
+        m_imageOffset += delta;
+        m_lastMousePos = event->pos();
+        updateDisplay();
+    }
+    QWidget::mouseMoveEvent(event);
+}
+
+void ImageViewer::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_isDragging = false;
+        setCursor(Qt::ArrowCursor);
+    }
+    QWidget::mouseReleaseEvent(event);
 }

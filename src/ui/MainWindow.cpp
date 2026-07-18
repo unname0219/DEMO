@@ -28,6 +28,10 @@
 #include <QWindow>
 #include <QApplication>
 #include <QPainter>
+#include <QMenu>
+#include <QAction>
+#include <QDateTime>
+#include <QDesktopServices>
 
 static const int kResizeBorder = 6; // 边缘可拉伸区域宽度（像素）
 
@@ -42,9 +46,14 @@ MainWindow::MainWindow(QWidget* parent)
     , m_settingsPanel(nullptr)
     , m_playerController(nullptr)
     , m_controlBar(nullptr)
+    , m_hideControlsTimer(nullptr)
     , m_isFullScreen(false)
 {
     m_playerController = new PlayerController(this);
+    m_hideControlsTimer = new QTimer(this);
+    m_hideControlsTimer->setInterval(3000);
+    m_hideControlsTimer->setSingleShot(true);
+    connect(m_hideControlsTimer, &QTimer::timeout, this, &MainWindow::hideControlsAfterTimeout);
 
     // 去掉 Windows 原生标题栏，使用自定义标题栏
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
@@ -70,10 +79,12 @@ void MainWindow::setupUI()
 {
     QWidget* centralWidget = new QWidget(this);
     centralWidget->setMouseTracking(true);
+    centralWidget->setStyleSheet("QWidget { background: transparent; }");
     setCentralWidget(centralWidget);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setContentsMargins(DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8), 
+                                   DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
     mainLayout->setSpacing(0);
 
     m_headerBar = new HeaderBar(this);
@@ -113,7 +124,7 @@ void MainWindow::setupUI()
     m_playbackControls = new PlaybackControls(m_controlBar);
     controlLayout->addWidget(m_playbackControls);
 
-    // 右侧弹性，让倍速/音量靠右
+    // 右侧弹性，让播放按钮真正居中
     controlLayout->addStretch();
 
     m_speedSelector = new SpeedSelector(m_controlBar);
@@ -121,6 +132,17 @@ void MainWindow::setupUI()
 
     m_volumeSlider = new VolumeSlider(m_controlBar);
     controlLayout->addWidget(m_volumeSlider);
+
+    QPushButton* toolboxBtn = new QPushButton(m_controlBar);
+    toolboxBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
+    toolboxBtn->setIconSize(QSize(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(20)));
+    toolboxBtn->setIcon(IconManager::instance()->icon("settings"));
+    toolboxBtn->setCursor(Qt::PointingHandCursor);
+    toolboxBtn->setToolTip("工具箱");
+    controlLayout->addWidget(toolboxBtn);
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, [toolboxBtn]() {
+        toolboxBtn->setIcon(IconManager::instance()->icon("settings"));
+    });
 
     mainLayout->addWidget(m_controlBar);
 
@@ -139,10 +161,8 @@ void MainWindow::setupConnections()
     connect(m_headerBar, &HeaderBar::openFileClicked, this, &MainWindow::openFileDialog);
     connect(m_headerBar, &HeaderBar::minimizeClicked, this, &QMainWindow::showMinimized);
     connect(m_headerBar, &HeaderBar::maximizeClicked, this, [this]() {
-        showMaximized();
-    });
-    connect(m_headerBar, &HeaderBar::windowizeClicked, this, [this]() {
-        showNormal();
+        if (isMaximized()) showNormal();
+        else showMaximized();
     });
     connect(m_headerBar, &HeaderBar::closeClicked, this, &QMainWindow::close);
 
@@ -313,13 +333,34 @@ void MainWindow::toggleFullScreen()
 {
     if (m_isFullScreen) {
         showNormal();
-        m_headerBar->show();
+        showControls();
         m_isFullScreen = false;
     } else {
         showFullScreen();
-        m_headerBar->hide();
+        hideControls();
         m_isFullScreen = true;
     }
+}
+
+void MainWindow::showControls()
+{
+    m_headerBar->show();
+    m_progressBar->show();
+    m_controlBar->show();
+    m_hideControlsTimer->stop();
+}
+
+void MainWindow::hideControls()
+{
+    if (!m_isFullScreen) return;
+    m_headerBar->hide();
+    m_progressBar->hide();
+    m_controlBar->hide();
+}
+
+void MainWindow::hideControlsAfterTimeout()
+{
+    hideControls();
 }
 
 void MainWindow::onVolumeBoostRequested()
@@ -521,5 +562,60 @@ void MainWindow::mouseMoveEvent(QMouseEvent* event)
     if (!isMaximized() && !m_isFullScreen) {
         updateResizeCursor(event->position().x(), event->position().y());
     }
+    if (m_isFullScreen) {
+        showControls();
+        m_hideControlsTimer->start();
+    }
     QMainWindow::mouseMoveEvent(event);
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::RightButton && !m_currentFile.isEmpty()) {
+        showFileInfoMenu(event->globalPosition().toPoint());
+    }
+    QMainWindow::mouseReleaseEvent(event);
+}
+
+void MainWindow::showFileInfoMenu(const QPoint& pos)
+{
+    QFileInfo fileInfo(m_currentFile);
+
+    QMenu menu(this);
+    menu.setTitle("文件信息");
+
+    QAction* nameAction = menu.addAction(tr("文件名: %1").arg(fileInfo.fileName()));
+    nameAction->setEnabled(false);
+
+    QAction* pathAction = menu.addAction(tr("路径: %1").arg(fileInfo.absolutePath()));
+    pathAction->setEnabled(false);
+
+    qint64 size = fileInfo.size();
+    QString sizeStr;
+    if (size < 1024) sizeStr = tr("%1 B").arg(size);
+    else if (size < 1024 * 1024) sizeStr = tr("%1 KB").arg(qRound(size / 1024.0));
+    else if (size < 1024 * 1024 * 1024) sizeStr = tr("%1 MB").arg(qRound(size / (1024.0 * 1024)));
+    else sizeStr = tr("%1 GB").arg(qRound(size / (1024.0 * 1024 * 1024)));
+    QAction* sizeAction = menu.addAction(tr("大小: %1").arg(sizeStr));
+    sizeAction->setEnabled(false);
+
+    QAction* createdAction = menu.addAction(tr("创建时间: %1").arg(
+        fileInfo.birthTime().toString("yyyy-MM-dd HH:mm:ss")));
+    createdAction->setEnabled(false);
+
+    QAction* modifiedAction = menu.addAction(tr("修改时间: %1").arg(
+        fileInfo.lastModified().toString("yyyy-MM-dd HH:mm:ss")));
+    modifiedAction->setEnabled(false);
+
+    QAction* typeAction = menu.addAction(tr("类型: %1").arg(fileInfo.suffix().toUpper()));
+    typeAction->setEnabled(false);
+
+    menu.addSeparator();
+    QAction* openFolderAction = menu.addAction(tr("打开所在文件夹"));
+    connect(openFolderAction, &QAction::triggered, this, [this]() {
+        QFileInfo info(m_currentFile);
+        QDesktopServices::openUrl(QUrl::fromLocalFile(info.absolutePath()));
+    });
+
+    menu.exec(pos);
 }

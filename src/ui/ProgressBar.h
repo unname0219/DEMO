@@ -23,6 +23,7 @@ public slots:
 private slots:
     void onSliderMoved(int value);
     void onSliderReleased();
+    void onValueChanged(int value);
 
 private:
     void setupUI();

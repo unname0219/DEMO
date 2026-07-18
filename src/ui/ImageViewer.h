@@ -24,6 +24,9 @@ protected:
     void wheelEvent(QWheelEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
 
 private slots:
     void showPrevious();
@@ -49,6 +52,10 @@ private:
     QString m_currentPath;
     QStringList m_imageFiles;
     int m_currentIndex;
+
+    bool m_isDragging;
+    QPoint m_lastMousePos;
+    QPoint m_imageOffset;
 };
 
 #endif

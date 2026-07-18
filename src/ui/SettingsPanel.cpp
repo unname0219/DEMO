@@ -62,6 +62,7 @@ void SettingsPanel::setupUI()
     titleFont.setBold(true);
     titleFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
     titleLabel->setFont(titleFont);
+    titleLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
     titleLayout->addWidget(titleLabel);
 
     titleLayout->addStretch();
@@ -82,8 +83,13 @@ void SettingsPanel::setupUI()
     mainLayout->addWidget(titleBar);
 
     m_tabWidget = new QTabWidget(this);
-    m_tabWidget->setTabPosition(QTabWidget::North);
+    m_tabWidget->setTabPosition(QTabWidget::West);
     m_tabWidget->setDocumentMode(true);
+    m_tabWidget->setStyleSheet(
+        "QTabWidget::pane { border: none; background: transparent; }"
+        "QTabWidget::tab-bar { alignment: left; }"
+        "QTabBar::tab { width: 100px; height: 40px; }"
+    );
     mainLayout->addWidget(m_tabWidget);
 
     QWidget* appearancePage = new QWidget();
@@ -105,6 +111,10 @@ void SettingsPanel::setupUI()
     QWidget* shortcutsPage = new QWidget();
     setupShortcutsPage(shortcutsPage);
     m_tabWidget->addTab(shortcutsPage, "快捷键");
+
+    QWidget* aboutPage = new QWidget();
+    setupAboutPage(aboutPage);
+    m_tabWidget->addTab(aboutPage, "关于");
 }
 
 void SettingsPanel::setupAppearancePage(QWidget* page)
@@ -394,4 +404,54 @@ void SettingsPanel::setupShortcutsPage(QWidget* page)
     scrollLayout->addStretch();
     scrollArea->setWidget(scrollContent);
     layout->addWidget(scrollArea, 1);
+}
+
+void SettingsPanel::setupAboutPage(QWidget* page)
+{
+    QVBoxLayout* layout = new QVBoxLayout(page);
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
+    layout->setSpacing(DPIAdapter::scaledSize(12));
+
+    QLabel* logoLabel = new QLabel(page);
+    logoLabel->setFixedSize(DPIAdapter::scaledSize(64), DPIAdapter::scaledSize(64));
+    logoLabel->setPixmap(IconManager::instance()->icon("logo", false).pixmap(logoLabel->size()));
+    logoLabel->setAlignment(Qt::AlignCenter);
+    layout->addWidget(logoLabel);
+
+    QLabel* nameLabel = new QLabel("Firefly Player", page);
+    QFont nameFont = nameLabel->font();
+    nameFont.setBold(true);
+    nameFont.setPointSizeF(DPIAdapter::scaledFontSize(14));
+    nameLabel->setFont(nameFont);
+    nameLabel->setAlignment(Qt::AlignCenter);
+    nameLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    layout->addWidget(nameLabel);
+
+    QLabel* versionLabel = new QLabel("版本 1.4.0", page);
+    QFont versionFont = versionLabel->font();
+    versionFont.setPointSizeF(DPIAdapter::scaledFontSize(10));
+    versionLabel->setFont(versionFont);
+    versionLabel->setAlignment(Qt::AlignCenter);
+    versionLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    layout->addWidget(versionLabel);
+
+    layout->addStretch();
+
+    QLabel* descLabel = new QLabel("一个轻量级的媒体播放器，支持视频、音频和图片播放。", page);
+    QFont descFont = descLabel->font();
+    descFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
+    descLabel->setFont(descFont);
+    descLabel->setAlignment(Qt::AlignCenter);
+    descLabel->setWordWrap(true);
+    descLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    layout->addWidget(descLabel);
+
+    QLabel* authorLabel = new QLabel("© 2024 Firefly", page);
+    QFont authorFont = authorLabel->font();
+    authorFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
+    authorLabel->setFont(authorFont);
+    authorLabel->setAlignment(Qt::AlignCenter);
+    authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    layout->addWidget(authorLabel);
 }

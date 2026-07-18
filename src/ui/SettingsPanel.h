@@ -25,6 +25,7 @@ private:
     void setupPluginsPage(QWidget* page);
     void setupPlaybackPage(QWidget* page);
     void setupShortcutsPage(QWidget* page);
+    void setupAboutPage(QWidget* page);
 
     QTabWidget* m_tabWidget;
 };

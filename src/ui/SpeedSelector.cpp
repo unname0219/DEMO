@@ -23,7 +23,12 @@ void SpeedSelector::setupUI()
 
     m_comboBox = new QComboBox(this);
     m_comboBox->setFixedHeight(DPIAdapter::scaledSize(32));
-    m_comboBox->setMinimumWidth(DPIAdapter::scaledSize(80));
+    m_comboBox->setMinimumWidth(DPIAdapter::scaledSize(60));
+    m_comboBox->setStyleSheet(
+        "QComboBox { border: none; background: transparent; padding: 0 8px; }"
+        "QComboBox::drop-down { border: none; }"
+        "QComboBox::down-arrow { image: none; }"
+    );
 
     QList<double> speeds = FormatUtils::availableSpeeds();
     for (double speed : speeds) {
