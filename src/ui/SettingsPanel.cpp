@@ -62,7 +62,7 @@ void SettingsPanel::setupUI()
     titleFont.setBold(true);
     titleFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
     titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    titleLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     titleLayout->addWidget(titleLabel);
 
     titleLayout->addStretch();
@@ -425,7 +425,7 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     nameFont.setPointSizeF(DPIAdapter::scaledFontSize(14));
     nameLabel->setFont(nameFont);
     nameLabel->setAlignment(Qt::AlignCenter);
-    nameLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    nameLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(nameLabel);
 
     QLabel* versionLabel = new QLabel("版本 1.4.0", page);
@@ -433,7 +433,7 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     versionFont.setPointSizeF(DPIAdapter::scaledFontSize(10));
     versionLabel->setFont(versionFont);
     versionLabel->setAlignment(Qt::AlignCenter);
-    versionLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    versionLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(versionLabel);
 
     layout->addStretch();
@@ -444,7 +444,7 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     descLabel->setFont(descFont);
     descLabel->setAlignment(Qt::AlignCenter);
     descLabel->setWordWrap(true);
-    descLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    descLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(descLabel);
 
     QLabel* authorLabel = new QLabel("© 2024 Firefly", page);
@@ -452,6 +452,6 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     authorFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
     authorLabel->setFont(authorFont);
     authorLabel->setAlignment(Qt::AlignCenter);
-    authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor().name()));
+    authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(authorLabel);
 }
