@@ -15,6 +15,9 @@ public:
 signals:
     void imageScalingChanged(bool smooth);
 
+protected:
+    void paintEvent(QPaintEvent* event) override;
+
 private:
     void setupUI();
     void setupAppearancePage(QWidget* page);
