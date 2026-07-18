@@ -88,13 +88,29 @@ QIcon IconManager::icon(const QString& name, bool tint) const
     QIcon ic;
     QSvgRenderer renderer(svg.toUtf8());
     if (renderer.isValid()) {
+        // 按 SVG 原始宽高比渲染，保持比例不拉伸
+        QSizeF svgSize = renderer.defaultSize();
         const int px = 128;
         QPixmap pixmap(px, px);
         pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing, true);
         painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-        renderer.render(&painter);
+        // 计算保持比例的目标矩形
+        QRectF targetRect;
+        if (svgSize.width() > 0 && svgSize.height() > 0) {
+            double scaleX = px / svgSize.width();
+            double scaleY = px / svgSize.height();
+            double scale = qMin(scaleX, scaleY);
+            int w = qRound(svgSize.width() * scale);
+            int h = qRound(svgSize.height() * scale);
+            int x = (px - w) / 2;
+            int y = (px - h) / 2;
+            targetRect = QRectF(x, y, w, h);
+        } else {
+            targetRect = QRectF(0, 0, px, px);
+        }
+        renderer.render(&painter, targetRect);
         painter.end();
         ic = QIcon(pixmap);
     }
