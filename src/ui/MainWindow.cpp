@@ -27,6 +27,7 @@
 #include <QMouseEvent>
 #include <QWindow>
 #include <QApplication>
+#include <QPainter>
 
 static const int kResizeBorder = 6; // 边缘可拉伸区域宽度（像素）
 
@@ -141,9 +142,8 @@ void MainWindow::setupConnections()
     });
     connect(m_headerBar, &HeaderBar::closeClicked, this, &QMainWindow::close);
 
-    connect(this, &QMainWindow::windowStateChanged, this, [this](Qt::WindowStates state) {
-        m_headerBar->updateMaximizeIcon(state & Qt::WindowMaximized);
-    });
+    // 初始化最大化按钮状态
+    m_headerBar->updateMaximizeIcon(isMaximized());
 
     connect(m_playbackControls, &PlaybackControls::playToggled,
             m_playerController, &PlayerController::togglePlayPause);
@@ -429,6 +429,14 @@ void MainWindow::paintEvent(QPaintEvent* event)
     painter.setBrush(QBrush(bg));
     painter.setPen(Qt::NoPen);
     painter.drawRoundedRect(rect(), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+}
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::WindowStateChange) {
+        m_headerBar->updateMaximizeIcon(isMaximized());
+    }
+    QMainWindow::changeEvent(event);
 }
 
 // 无边框窗口的边缘拉伸：检测鼠标是否在窗口边缘，触发系统级缩放
