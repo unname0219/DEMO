@@ -59,7 +59,7 @@ void SettingsPanel::setupUI()
 
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(DPIAdapter::scaledSize(36));
-    m_titleBar->setCursor(Qt::MoveCursor);
+    m_titleBar->setCursor(Qt::SizeAllCursor);
     QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
     titleLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(8), 0);
     titleLayout->setSpacing(DPIAdapter::scaledSize(8));
