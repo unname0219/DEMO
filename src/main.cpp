@@ -2,6 +2,7 @@
 #include <QSettings>
 #include <QDir>
 #include <QIcon>
+#include <QFile>
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
 #include "managers/FileAssociation.h"
@@ -60,7 +61,20 @@ int main(int argc, char *argv[])
     }
 
     MainWindow window;
+
+    QString filePathToOpen;
+    if (argc > 1) {
+        filePathToOpen = QString::fromLocal8Bit(argv[1]);
+        if (!QFile::exists(filePathToOpen)) {
+            filePathToOpen = QString(argv[1]).replace("\"", "");
+        }
+    }
+
     window.show();
+
+    if (!filePathToOpen.isEmpty()) {
+        window.openFile(filePathToOpen);
+    }
 
     return app.exec();
 }
