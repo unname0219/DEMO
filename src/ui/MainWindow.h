@@ -22,6 +22,8 @@ public:
     MainWindow(QWidget* parent = nullptr);
     ~MainWindow();
 
+    void openFile(const QString& filePath);
+
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
@@ -37,7 +39,6 @@ protected:
 
 private slots:
     void openFileDialog();
-    void openFile(const QString& filePath);
     void toggleSettings();
     void toggleFullScreen();
     void onVolumeBoostRequested();
