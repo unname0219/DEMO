@@ -2,28 +2,61 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - main
       - master
-  pull_request:
-    branches:
-      - main
-      - master
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release名称（留空则自动生成）'
+        required: false
+        default: ''
 
 permissions:
   contents: write
 
 jobs:
-  build-linux:
-    name: Build on Linux (x64)
-    runs-on: ubuntu-22.04
+  # ============ 构建任务 ============
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            name: Linux-x64
+            artifact_name: FireflyPlayer-Linux-x64
+            archive_name: FireflyPlayer-Linux-x64.tar.gz
+          - os: windows-2022
+            name: Windows-x64
+            artifact_name: FireflyPlayer-Windows-x64
+            archive_name: FireflyPlayer-Windows-x64.zip
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.name }})
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Install Qt6
+      - name: Generate version info
+        id: version
+        shell: bash
+        run: |
+          # 从CMakeLists.txt读取版本号
+          VERSION=$(grep -oP 'project\(FireflyPlayer VERSION \K[0-9.]+' CMakeLists.txt)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          # 生成构建号：日期+短commit
+          BUILD_ID=$(date +'%Y%m%d')-$(git rev-parse --short HEAD)
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+          # 完整release名称
+          RELEASE_NAME="v${VERSION}-${BUILD_ID}"
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "### Version: $VERSION (Build: $BUILD_ID)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Install Qt6 (Linux)
+        if: runner.os == 'Linux'
         uses: jurplel/install-qt-action@v3
         with:
           version: '6.6.3'
@@ -33,18 +66,39 @@ jobs:
           modules: 'qtmultimedia'
           cache: 'true'
 
-      - name: Configure CMake
+      - name: Install Qt6 (Windows)
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v3
+        with:
+          version: '6.6.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2019_64'
+          modules: 'qtmultimedia'
+          cache: 'true'
+
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
         run: |
           mkdir -p build
           cd build
           cmake .. -DCMAKE_BUILD_TYPE=Release
 
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir build
+          cd build
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+
       - name: Build
+        shell: bash
         run: |
           cd build
-          cmake --build . --config Release -j$(nproc)
+          cmake --build . --config Release -j$(nproc 2>/dev/null || echo 4)
 
-      - name: Package (AppImage)
+      - name: Package Linux (AppImage)
+        if: runner.os == 'Linux'
         run: |
           cd build
           sudo apt-get update
@@ -58,85 +112,221 @@ jobs:
           ls -la *.AppImage 2>/dev/null || echo "AppImage creation failed, uploading binary directly"
         continue-on-error: true
 
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FireflyPlayer-Linux-x64
-          path: |
-            build/bin/FireflyPlayer
-            build/*.AppImage
-          retention-days: 7
-
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            build/bin/FireflyPlayer
-            build/*.AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-windows:
-    name: Build on Windows (x64)
-    runs-on: windows-2022
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Qt6
-        uses: jurplel/install-qt-action@v3
-        with:
-          version: '6.6.3'
-          host: 'windows'
-          target: 'desktop'
-          arch: 'win64_msvc2019_64'
-          modules: 'qtmultimedia'
-          cache: 'true'
-
-      - name: Configure CMake
-        run: |
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: |
-          cd build
-          cmake --build . --config Release
-
-      - name: Deploy Qt libraries
+      - name: Deploy Qt libraries (Windows)
+        if: runner.os == 'Windows'
         run: |
           cd build/bin/Release
           windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FireflyPlayer-Windows-x64
-          path: build/bin/Release/
-          retention-days: 7
+      - name: Create archive (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd build
+          tar -czf ${{ matrix.archive_name }} -C bin FireflyPlayer
+          # 如果有AppImage也打包
+          ls *.AppImage 2>/dev/null && cp *.AppImage ${{ github.workspace }}/ || true
 
-      - name: Zip for release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           cd build/bin
-          Compress-Archive -Path Release/* -DestinationPath FireflyPlayer-Windows-x64.zip
+          Compress-Archive -Path Release/* -DestinationPath ${{ matrix.archive_name }}
 
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: build/bin/FireflyPlayer-Windows-x64.zip
+          name: ${{ matrix.artifact_name }}
+          path: |
+            build/${{ matrix.archive_name }}
+            build/*.AppImage
+          retention-days: 30
+
+      - name: Output version
+        id: output_version
+        shell: bash
+        run: |
+          echo "version=${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "build_id=${{ steps.version.outputs.build_id }}" >> $GITHUB_OUTPUT
+          echo "release_name=${{ steps.version.outputs.release_name }}" >> $GITHUB_OUTPUT
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_id: ${{ steps.version.outputs.build_id }}
+      release_name: ${{ steps.version.outputs.release_name }}
+
+  # ============ 发布任务 ============
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Publish Release
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare release info
+        id: release_info
+        run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          BUILD_ID="${{ needs.build.outputs.build_id }}"
+          RELEASE_NAME="${{ needs.build.outputs.release_name }}"
+
+          # 如果手动指定了名称则使用
+          if [ -n "${{ github.event.inputs.release_name }}" ]; then
+            RELEASE_NAME="${{ github.event.inputs.release_name }}"
+          fi
+
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "tag_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+
+          # 生成更新日志
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            echo "## 更新内容" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD >> CHANGELOG.md
+          else
+            echo "## 更新内容" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            git log --pretty=format:"- %s (%h)" -20 >> CHANGELOG.md
+          fi
+          echo "" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**版本**: $VERSION" >> CHANGELOG.md
+          echo "**构建号**: $BUILD_ID" >> CHANGELOG.md
+          echo "**提交**: ${{ github.sha }}" >> CHANGELOG.md
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
+
+      - name: Delete previous prerelease
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 删除旧的自动构建tag（保留正式版本tag如v1.6.0）
+          git fetch --tags
+          for tag in $(git tag -l "*-*-*"); do
+            echo "Deleting old auto tag: $tag"
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+          done
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag_name }}
+          name: ${{ steps.release_info.outputs.release_name }}
+          body_path: CHANGELOG.md
+          files: |
+            artifacts/FireflyPlayer-Linux-x64/*
+            artifacts/FireflyPlayer-Windows-x64/*
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ============ 同步到 Gitee ============
+  sync-to-gitee:
+    needs: release
+    runs-on: ubuntu-latest
+    name: Sync to Gitee
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Push to Gitee
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           git remote add gitee https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_TOKEN }}@gitee.com/unname0219/DEMO.git
-          git fetch gitee
+          git fetch gitee || true
           git push gitee main --force
-          git push gitee --tags
+          git push gitee --tags --force
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Upload to Gitee Release
+        run: |
+          # 安装gitee上传工具
+          pip install requests
+
+          # 获取Gitee最新release
+          GITEE_API="https://gitee.com/api/v5/repos/unname0219/DEMO/releases"
+          TAG_NAME="${{ needs.build.outputs.release_name }}"
+
+          # 创建release
+          python3 -c "
+          import requests
+          import json
+          import os
+
+          api = 'https://gitee.com/api/v5/repos/unname0219/DEMO/releases'
+          token = os.environ.get('GITEE_TOKEN')
+          tag = os.environ.get('TAG_NAME')
+
+          # 创建release
+          data = {
+              'access_token': token,
+              'tag_name': tag,
+              'name': tag,
+              'body': '自动构建发布 ' + tag,
+              'target_commitish': 'main',
+              'prerelease': False
+          }
+          r = requests.post(api, data=data)
+          print('Create release:', r.status_code)
+          if r.status_code == 201:
+              release_id = r.json()['id']
+              print('Release ID:', release_id)
+              # 保存release_id供后续使用
+              with open('release_id.txt', 'w') as f:
+                  f.write(str(release_id))
+          else:
+              print(r.text)
+          "
+          env:
+            GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+            TAG_NAME: ${{ needs.build.outputs.release_name }}
+
+      - name: Upload assets to Gitee
+        run: |
+          python3 -c "
+          import requests
+          import os
+          import glob
+
+          token = os.environ.get('GITEE_TOKEN')
+          release_id = open('release_id.txt').read().strip()
+          api = f'https://gitee.com/api/v5/repos/unname0219/DEMO/releases/{release_id}/attach_files'
+
+          # 遍历所有构建产物
+          for filepath in glob.glob('release-assets/**/*', recursive=True):
+              if os.path.isfile(filepath):
+                  filename = os.path.basename(filepath)
+                  print(f'Uploading {filename}...')
+                  with open(filepath, 'rb') as f:
+                      data = {'access_token': token}
+                      files = {'file': (filename, f)}
+                      r = requests.post(api, data=data, files=files)
+                      print(f'  Status: {r.status_code}')
+                      if r.status_code != 201:
+                          print(f'  Error: {r.text}')
+          "
+          env:
+            GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
