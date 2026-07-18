@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QSettings>
 #include <QDir>
+#include <QIcon>
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
 #include "managers/FileAssociation.h"
@@ -31,6 +32,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationVersion("1.0.0");
 
     QApplication app(argc, argv);
+    app.setWindowIcon(QIcon(":/icons/logo.svg"));
 
     // 必须在创建任何使用 QSettings 的对象之前设置路径
     setupPortableConfigPaths();

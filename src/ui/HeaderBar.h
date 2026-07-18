@@ -20,6 +20,7 @@ signals:
     void openFileClicked();
     void minimizeClicked();
     void maximizeClicked();
+    void windowizeClicked();
     void closeClicked();
 
 private slots:
@@ -34,6 +35,7 @@ private:
     QPushButton* m_openFileBtn;
     QPushButton* m_minimizeBtn;
     QPushButton* m_maximizeBtn;
+    QPushButton* m_windowizeBtn;
     QPushButton* m_closeBtn;
     QString m_title;
 

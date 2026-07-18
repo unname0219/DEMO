@@ -58,9 +58,9 @@ void PlaybackControls::setupUI()
                                       playBtnSize - DPIAdapter::scaledSize(8)));
     m_playPauseBtn->setCursor(Qt::PointingHandCursor);
     m_playPauseBtn->setStyleSheet(
-        "QPushButton { background-color: transparent; border: none; }"
-        "QPushButton:hover { background-color: rgba(255,255,255,10); }"
-        "QPushButton:pressed { background-color: rgba(255,255,255,20); }"
+        "QPushButton { background-color: transparent; border: none; outline: none; }"
+        "QPushButton:hover { background-color: transparent; }"
+        "QPushButton:pressed { background-color: transparent; }"
     );
     connect(m_playPauseBtn, &QPushButton::clicked, this, &PlaybackControls::playToggled);
     layout->addWidget(m_playPauseBtn);

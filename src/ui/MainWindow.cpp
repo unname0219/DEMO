@@ -134,11 +134,15 @@ void MainWindow::setupConnections()
     m_mediaViewer->installEventFilter(this);
     m_progressBar->installEventFilter(this);
     m_controlBar->installEventFilter(this);
+    m_headerBar->installEventFilter(this);
 
     connect(m_headerBar, &HeaderBar::openFileClicked, this, &MainWindow::openFileDialog);
     connect(m_headerBar, &HeaderBar::minimizeClicked, this, &QMainWindow::showMinimized);
     connect(m_headerBar, &HeaderBar::maximizeClicked, this, [this]() {
-        if (isMaximized()) showNormal(); else showMaximized();
+        showMaximized();
+    });
+    connect(m_headerBar, &HeaderBar::windowizeClicked, this, [this]() {
+        showNormal();
     });
     connect(m_headerBar, &HeaderBar::closeClicked, this, &QMainWindow::close);
 
@@ -283,8 +287,10 @@ void MainWindow::toggleSettings()
     if (m_settingsPanel->isVisible()) {
         m_settingsPanel->hide();
     } else {
-        m_settingsPanel->move((width() - m_settingsPanel->width()) / 2,
-                              (height() - m_settingsPanel->height()) / 2);
+        m_settingsPanel->move(mapToGlobal(QPoint(
+            (width() - m_settingsPanel->width()) / 2,
+            (height() - m_settingsPanel->height()) / 2
+        )));
         m_settingsPanel->show();
         m_settingsPanel->raise();
         m_settingsPanel->activateWindow();
@@ -469,6 +475,29 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
         QPoint globalPos = mouseEvent->globalPosition().toPoint();
         QPoint localPos = mapFromGlobal(globalPos);
         updateResizeCursor(localPos.x(), localPos.y());
+        return true;
+    }
+    if (event->type() == QEvent::MouseButtonPress && !isMaximized() && !m_isFullScreen) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            QPoint globalPos = mouseEvent->globalPosition().toPoint();
+            QPoint localPos = mapFromGlobal(globalPos);
+            int x = localPos.x();
+            int y = localPos.y();
+            int bw = DPIAdapter::scaledSize(kResizeBorder);
+            Qt::Edges edges;
+            if (x >= 0 && x < bw) edges |= Qt::LeftEdge;
+            if (x <= width() && x > width() - bw) edges |= Qt::RightEdge;
+            if (y >= 0 && y < bw) edges |= Qt::TopEdge;
+            if (y <= height() && y > height() - bw) edges |= Qt::BottomEdge;
+            if (edges) {
+                QWindow* w = windowHandle();
+                if (w) {
+                    w->startSystemResize(edges);
+                    return true;
+                }
+            }
+        }
     }
     return QMainWindow::eventFilter(obj, event);
 }

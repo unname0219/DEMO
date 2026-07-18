@@ -14,6 +14,7 @@
 #include <QSettings>
 #include <QComboBox>
 #include <QFrame>
+#include <QPainter>
 
 SettingsPanel::SettingsPanel(QWidget* parent)
     : QDialog(parent)
@@ -23,7 +24,20 @@ SettingsPanel::SettingsPanel(QWidget* parent)
     setModal(true);
     setMinimumSize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(480));
     resize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(520));
+    setAttribute(Qt::WA_TranslucentBackground, true);
+    setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     setupUI();
+}
+
+void SettingsPanel::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QColor bg = ThemeManager::instance()->backgroundColor();
+    painter.setBrush(QBrush(bg));
+    painter.setPen(Qt::NoPen);
+    painter.drawRoundedRect(rect(), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
 }
 
 SettingsPanel::~SettingsPanel()
@@ -33,8 +47,39 @@ SettingsPanel::~SettingsPanel()
 void SettingsPanel::setupUI()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setContentsMargins(DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8), 
+                                   DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
     mainLayout->setSpacing(0);
+
+    QWidget* titleBar = new QWidget(this);
+    titleBar->setFixedHeight(DPIAdapter::scaledSize(36));
+    QHBoxLayout* titleLayout = new QHBoxLayout(titleBar);
+    titleLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(8), 0);
+    titleLayout->setSpacing(DPIAdapter::scaledSize(8));
+
+    QLabel* titleLabel = new QLabel("设置", titleBar);
+    QFont titleFont = titleLabel->font();
+    titleFont.setBold(true);
+    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
+    titleLabel->setFont(titleFont);
+    titleLayout->addWidget(titleLabel);
+
+    titleLayout->addStretch();
+
+    QPushButton* closeBtn = new QPushButton(titleBar);
+    closeBtn->setFixedSize(DPIAdapter::scaledSize(28), DPIAdapter::scaledSize(28));
+    closeBtn->setIconSize(QSize(DPIAdapter::scaledSize(14), DPIAdapter::scaledSize(14)));
+    closeBtn->setIcon(IconManager::instance()->icon("close"));
+    closeBtn->setCursor(Qt::PointingHandCursor);
+    closeBtn->setToolTip("关闭");
+    closeBtn->setStyleSheet(
+        "QPushButton { background: transparent; border: none; }"
+        "QPushButton:hover { background-color: rgba(255,255,255,10); border-radius: 4px; }"
+    );
+    connect(closeBtn, &QPushButton::clicked, this, &QDialog::close);
+    titleLayout->addWidget(closeBtn);
+
+    mainLayout->addWidget(titleBar);
 
     m_tabWidget = new QTabWidget(this);
     m_tabWidget->setTabPosition(QTabWidget::North);

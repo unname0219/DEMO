@@ -16,6 +16,7 @@ HeaderBar::HeaderBar(QWidget* parent)
     , m_openFileBtn(nullptr)
     , m_minimizeBtn(nullptr)
     , m_maximizeBtn(nullptr)
+    , m_windowizeBtn(nullptr)
     , m_closeBtn(nullptr)
     , m_title("Firefly")
 {
@@ -95,6 +96,14 @@ void HeaderBar::setupUI()
     connect(m_maximizeBtn, &QPushButton::clicked, this, &HeaderBar::maximizeClicked);
     layout->addWidget(m_maximizeBtn);
 
+    m_windowizeBtn = new QPushButton(this);
+    m_windowizeBtn->setFixedSize(winBtnW, winBtnH);
+    m_windowizeBtn->setIconSize(QSize(winIconSize, winIconSize));
+    m_windowizeBtn->setCursor(Qt::PointingHandCursor);
+    m_windowizeBtn->setToolTip("窗口化");
+    connect(m_windowizeBtn, &QPushButton::clicked, this, &HeaderBar::windowizeClicked);
+    layout->addWidget(m_windowizeBtn);
+
     m_closeBtn = new QPushButton(this);
     m_closeBtn->setFixedSize(winBtnW, winBtnH);
     m_closeBtn->setIconSize(QSize(winIconSize, winIconSize));
@@ -116,6 +125,7 @@ void HeaderBar::refreshIcons()
     m_openFileBtn->setIcon(IconManager::instance()->icon("open-file"));
     m_minimizeBtn->setIcon(IconManager::instance()->icon("minimize"));
     m_closeBtn->setIcon(IconManager::instance()->icon("close"));
+    m_windowizeBtn->setIcon(IconManager::instance()->icon("restore"));
 }
 
 void HeaderBar::updateMaximizeIcon(bool isMaximized)
