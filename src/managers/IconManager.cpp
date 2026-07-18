@@ -85,23 +85,18 @@ QIcon IconManager::icon(const QString& name, bool tint) const
         return m_cache[cacheKey];
     }
     QString svg = loadResourceSvg(name);
-    // 用一个透明占位色，渲染时不会替换任何 currentColor
-    QIcon ic = buildIcon(svg, QColor(0, 0, 0, 0));
-    // 上面会把 currentColor 替换为透明，这对保留原色的图标无影响
-    // 但为避免 currentColor 仍然存在导致渲染异常，再渲染一次原始内容
-    {
-        QSvgRenderer renderer(svg.toUtf8());
-        if (renderer.isValid()) {
-            const int px = 128;
-            QPixmap pixmap(px, px);
-            pixmap.fill(Qt::transparent);
-            QPainter painter(&pixmap);
-            painter.setRenderHint(QPainter::Antialiasing, true);
-            painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-            renderer.render(&painter);
-            painter.end();
-            ic = QIcon(pixmap);
-        }
+    QIcon ic;
+    QSvgRenderer renderer(svg.toUtf8());
+    if (renderer.isValid()) {
+        const int px = 128;
+        QPixmap pixmap(px, px);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+        renderer.render(&painter);
+        painter.end();
+        ic = QIcon(pixmap);
     }
     m_cache[cacheKey] = ic;
     return ic;

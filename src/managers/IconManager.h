@@ -47,6 +47,7 @@ private:
     QIcon buildIcon(const QString& svgContent, const QColor& color) const;
     QString loadResourceSvg(const QString& alias) const;
 
+    static IconManager* s_instance;
     mutable QHash<QString, QIcon> m_cache;
     mutable QHash<QString, QString> m_rawSvgCache; // 原始 SVG 内容缓存
 };
