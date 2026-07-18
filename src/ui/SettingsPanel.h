@@ -4,6 +4,7 @@
 #include <QDialog>
 #include <QTabWidget>
 #include <QMediaPlayer>
+#include <QMouseEvent>
 
 class SettingsPanel : public QDialog
 {
@@ -19,6 +20,9 @@ signals:
 
 protected:
     void paintEvent(QPaintEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mouseReleaseEvent(QMouseEvent* event) override;
 
 private:
     void setupUI();
@@ -30,6 +34,9 @@ private:
     void setupAboutPage(QWidget* page);
 
     QTabWidget* m_tabWidget;
+    QWidget* m_titleBar;
+    bool m_isDragging;
+    QPoint m_dragStartPosition;
 };
 
 #endif

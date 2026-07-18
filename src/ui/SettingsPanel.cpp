@@ -15,15 +15,18 @@
 #include <QComboBox>
 #include <QFrame>
 #include <QPainter>
+#include <QMouseEvent>
 
 SettingsPanel::SettingsPanel(QWidget* parent)
     : QDialog(parent)
     , m_tabWidget(nullptr)
+    , m_titleBar(nullptr)
+    , m_isDragging(false)
 {
     setWindowTitle("Firefly Player - 设置");
     setModal(true);
-    setMinimumSize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(480));
-    resize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(520));
+    setMinimumSize(DPIAdapter::scaledSize(600), DPIAdapter::scaledSize(480));
+    resize(DPIAdapter::scaledSize(600), DPIAdapter::scaledSize(520));
     setAttribute(Qt::WA_TranslucentBackground, true);
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     setupUI();
@@ -54,13 +57,14 @@ void SettingsPanel::setupUI()
                                    DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
     mainLayout->setSpacing(0);
 
-    QWidget* titleBar = new QWidget(this);
-    titleBar->setFixedHeight(DPIAdapter::scaledSize(36));
-    QHBoxLayout* titleLayout = new QHBoxLayout(titleBar);
+    m_titleBar = new QWidget(this);
+    m_titleBar->setFixedHeight(DPIAdapter::scaledSize(36));
+    m_titleBar->setCursor(Qt::MoveCursor);
+    QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
     titleLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(8), 0);
     titleLayout->setSpacing(DPIAdapter::scaledSize(8));
 
-    QLabel* titleLabel = new QLabel("设置", titleBar);
+    QLabel* titleLabel = new QLabel("设置", m_titleBar);
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
@@ -70,7 +74,7 @@ void SettingsPanel::setupUI()
 
     titleLayout->addStretch();
 
-    QPushButton* closeBtn = new QPushButton(titleBar);
+    QPushButton* closeBtn = new QPushButton(m_titleBar);
     closeBtn->setFixedSize(DPIAdapter::scaledSize(28), DPIAdapter::scaledSize(28));
     closeBtn->setIconSize(QSize(DPIAdapter::scaledSize(14), DPIAdapter::scaledSize(14)));
     closeBtn->setIcon(IconManager::instance()->icon("close"));
@@ -83,27 +87,27 @@ void SettingsPanel::setupUI()
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::close);
     titleLayout->addWidget(closeBtn);
 
-    mainLayout->addWidget(titleBar);
+    mainLayout->addWidget(m_titleBar);
 
     m_tabWidget = new QTabWidget(this);
-    m_tabWidget->setTabPosition(QTabWidget::North);
+    m_tabWidget->setTabPosition(QTabWidget::West);
     m_tabWidget->setDocumentMode(true);
     QString tabStyle = QString(
-        "QTabWidget::pane { border: 1px solid %3; border-top: none; background: transparent; border-radius: 0 0 6px 6px; }"
-        "QTabWidget::tab-bar { alignment: center; }"
-        "QTabBar::tab { height: %4px; min-width: %5px; "
-        "background: transparent; color: %1; padding: 0 %6px; margin-right: 2px; "
-        "border: 1px solid transparent; border-bottom: none; border-radius: %7px %7px 0 0; }"
+        "QTabWidget::pane { border: 1px solid %3; border-left: none; background: transparent; border-radius: 0 6px 6px 0; }"
+        "QTabWidget::tab-bar { width: %4px; }"
+        "QTabBar::tab { height: %5px; width: %4px; "
+        "background: transparent; color: %1; padding: 0 %6px; margin-bottom: 2px; "
+        "border: 1px solid transparent; border-right: none; border-radius: %7px 0 0 %7px; }"
         "QTabBar::tab:selected { background: rgba(0,212,170,20); color: %2; "
-        "border: 1px solid %3; border-bottom: none; }"
+        "border: 1px solid %3; border-right: none; }"
         "QTabBar::tab:hover { background: rgba(0,212,170,10); }"
     ).arg(
         ThemeManager::instance()->textColor(),
         ThemeManager::instance()->primaryColor(),
         ThemeManager::instance()->borderColor(),
-        QString::number(DPIAdapter::scaledSize(36)),
-        QString::number(DPIAdapter::scaledSize(70)),
-        QString::number(DPIAdapter::scaledSize(12)),
+        QString::number(DPIAdapter::scaledSize(80)),
+        QString::number(DPIAdapter::scaledSize(40)),
+        QString::number(DPIAdapter::scaledSize(8)),
         QString::number(DPIAdapter::scaledSize(4))
     );
     m_tabWidget->setStyleSheet(tabStyle);
@@ -502,4 +506,31 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     authorLabel->setAlignment(Qt::AlignCenter);
     authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(authorLabel);
+}
+
+void SettingsPanel::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton && m_titleBar && m_titleBar->rect().contains(event->pos())) {
+        m_isDragging = true;
+        m_dragStartPosition = event->globalPos() - frameGeometry().topLeft();
+        event->accept();
+    }
+    QDialog::mousePressEvent(event);
+}
+
+void SettingsPanel::mouseMoveEvent(QMouseEvent* event)
+{
+    if (m_isDragging && (event->buttons() & Qt::LeftButton)) {
+        move(event->globalPos() - m_dragStartPosition);
+        event->accept();
+    }
+    QDialog::mouseMoveEvent(event);
+}
+
+void SettingsPanel::mouseReleaseEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_isDragging = false;
+    }
+    QDialog::mouseReleaseEvent(event);
 }
