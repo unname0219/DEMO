@@ -68,11 +68,24 @@ set(RESOURCES
     resources/resources.qrc
 )
 
-qt_add_executable(FireflyPlayer
-    ${SOURCES}
-    ${HEADERS}
-    ${RESOURCES}
+set(WIN_RESOURCES
+    resources/app.rc
 )
+
+if(WIN32)
+    qt_add_executable(FireflyPlayer
+        ${SOURCES}
+        ${HEADERS}
+        ${RESOURCES}
+        ${WIN_RESOURCES}
+    )
+else()
+    qt_add_executable(FireflyPlayer
+        ${SOURCES}
+        ${HEADERS}
+        ${RESOURCES}
+    )
+endif()
 
 target_include_directories(FireflyPlayer PRIVATE
     ${CMAKE_SOURCE_DIR}/src

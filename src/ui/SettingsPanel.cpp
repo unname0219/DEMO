@@ -4,26 +4,25 @@
 #include "managers/PluginManager.h"
 #include "managers/DPIAdapter.h"
 #include "managers/IconManager.h"
-#include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QRadioButton>
-#include <QButtonGroup>
 #include <QCheckBox>
 #include <QGroupBox>
-#include <QListWidgetItem>
 #include <QScrollArea>
 #include <QPushButton>
 #include <QSettings>
 #include <QComboBox>
 #include <QFrame>
-#include <QSize>
 
 SettingsPanel::SettingsPanel(QWidget* parent)
-    : QWidget(parent)
-    , m_categoryList(nullptr)
-    , m_contentStack(nullptr)
+    : QDialog(parent)
+    , m_tabWidget(nullptr)
 {
+    setWindowTitle("Firefly Player - 设置");
+    setModal(true);
+    setMinimumSize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(480));
+    resize(DPIAdapter::scaledSize(560), DPIAdapter::scaledSize(520));
     setupUI();
 }
 
@@ -33,109 +32,81 @@ SettingsPanel::~SettingsPanel()
 
 void SettingsPanel::setupUI()
 {
-    // 设置面板使用固定合理的字号，不依赖过大 DPI 缩放
-    setMinimumWidth(DPIAdapter::scaledSize(360));
-
-    QHBoxLayout* mainLayout = new QHBoxLayout(this);
+    QVBoxLayout* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    m_categoryList = new QListWidget(this);
-    m_categoryList->setFixedWidth(DPIAdapter::scaledSize(120));
-    m_categoryList->setIconSize(QSize(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16)));
-    m_categoryList->addItem("外观");
-    m_categoryList->addItem("文件关联");
-    m_categoryList->addItem("格式支持包");
-    m_categoryList->addItem("播放设置");
-    m_categoryList->addItem("快捷键");
-    m_categoryList->setCurrentRow(0);
-    connect(m_categoryList, &QListWidget::currentRowChanged,
-            this, &SettingsPanel::onCategoryChanged);
-    mainLayout->addWidget(m_categoryList);
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->setTabPosition(QTabWidget::North);
+    m_tabWidget->setDocumentMode(true);
+    mainLayout->addWidget(m_tabWidget);
 
-    QFrame* separator = new QFrame(this);
-    separator->setFrameShape(QFrame::VLine);
-    separator->setFixedWidth(1);
-    separator->setProperty("role", "separator");
-    mainLayout->addWidget(separator);
+    QWidget* appearancePage = new QWidget();
+    setupAppearancePage(appearancePage);
+    m_tabWidget->addTab(appearancePage, "外观");
 
-    m_contentStack = new QStackedWidget(this);
-    mainLayout->addWidget(m_contentStack, 1);
+    QWidget* fileAssocPage = new QWidget();
+    setupFileAssocPage(fileAssocPage);
+    m_tabWidget->addTab(fileAssocPage, "文件关联");
 
-    setupAppearancePage();
-    setupFileAssocPage();
-    setupPluginsPage();
-    setupPlaybackPage();
-    setupShortcutsPage();
+    QWidget* pluginsPage = new QWidget();
+    setupPluginsPage(pluginsPage);
+    m_tabWidget->addTab(pluginsPage, "格式支持包");
+
+    QWidget* playbackPage = new QWidget();
+    setupPlaybackPage(playbackPage);
+    m_tabWidget->addTab(playbackPage, "播放设置");
+
+    QWidget* shortcutsPage = new QWidget();
+    setupShortcutsPage(shortcutsPage);
+    m_tabWidget->addTab(shortcutsPage, "快捷键");
 }
 
-void SettingsPanel::onCategoryChanged(int row)
+void SettingsPanel::setupAppearancePage(QWidget* page)
 {
-    m_contentStack->setCurrentIndex(row);
-}
-
-void SettingsPanel::setupAppearancePage()
-{
-    QScrollArea* scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-
-    QWidget* page = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16),
-                                DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16));
-    layout->setSpacing(DPIAdapter::scaledSize(12));
-
-    QLabel* title = new QLabel("外观设置", page);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(12));
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    layout->addWidget(title);
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
+    layout->setSpacing(DPIAdapter::scaledSize(16));
 
     QGroupBox* themeGroup = new QGroupBox("主题模式", page);
     QVBoxLayout* themeLayout = new QVBoxLayout(themeGroup);
-    themeLayout->setSpacing(DPIAdapter::scaledSize(6));
-
-    QRadioButton* systemBtn = new QRadioButton("跟随系统", themeGroup);
-    QRadioButton* lightBtn = new QRadioButton("浅色模式", themeGroup);
-    QRadioButton* darkBtn = new QRadioButton("深色模式", themeGroup);
+    themeLayout->setSpacing(DPIAdapter::scaledSize(8));
 
     ThemeMode currentMode = ThemeManager::instance()->themeMode();
-    switch (currentMode) {
-    case ThemeMode::System: systemBtn->setChecked(true); break;
-    case ThemeMode::Light: lightBtn->setChecked(true); break;
-    case ThemeMode::Dark: darkBtn->setChecked(true); break;
-    }
 
+    QRadioButton* systemBtn = new QRadioButton("跟随系统", themeGroup);
+    systemBtn->setChecked(currentMode == ThemeMode::System);
     connect(systemBtn, &QRadioButton::toggled, this, [](bool checked) {
         if (checked) ThemeManager::instance()->setThemeMode(ThemeMode::System);
     });
+    themeLayout->addWidget(systemBtn);
+
+    QRadioButton* lightBtn = new QRadioButton("浅色模式", themeGroup);
+    lightBtn->setChecked(currentMode == ThemeMode::Light);
     connect(lightBtn, &QRadioButton::toggled, this, [](bool checked) {
         if (checked) ThemeManager::instance()->setThemeMode(ThemeMode::Light);
     });
+    themeLayout->addWidget(lightBtn);
+
+    QRadioButton* darkBtn = new QRadioButton("深色模式", themeGroup);
+    darkBtn->setChecked(currentMode == ThemeMode::Dark);
     connect(darkBtn, &QRadioButton::toggled, this, [](bool checked) {
         if (checked) ThemeManager::instance()->setThemeMode(ThemeMode::Dark);
     });
-
-    themeLayout->addWidget(systemBtn);
-    themeLayout->addWidget(lightBtn);
     themeLayout->addWidget(darkBtn);
+
     layout->addWidget(themeGroup);
 
     QGroupBox* imgGroup = new QGroupBox("图片缩放", page);
     QVBoxLayout* imgLayout = new QVBoxLayout(imgGroup);
-    imgLayout->setSpacing(DPIAdapter::scaledSize(6));
-
-    QRadioButton* smoothBtn = new QRadioButton("平滑模式 (高质量插值)", imgGroup);
-    QRadioButton* pixelBtn = new QRadioButton("像素模式 (显示像素点)", imgGroup);
+    imgLayout->setSpacing(DPIAdapter::scaledSize(8));
 
     QSettings settings;
     bool smooth = settings.value("image/smoothScaling", true).toBool();
-    smoothBtn->setChecked(smooth);
-    pixelBtn->setChecked(!smooth);
 
-    // 改动立即生效：保存配置并发出信号，由 ImageViewer 实时响应
+    QRadioButton* smoothBtn = new QRadioButton("平滑模式 (高质量插值)", imgGroup);
+    smoothBtn->setChecked(smooth);
     connect(smoothBtn, &QRadioButton::toggled, this, [this](bool checked) {
         if (checked) {
             QSettings s;
@@ -143,6 +114,10 @@ void SettingsPanel::setupAppearancePage()
             emit imageScalingChanged(true);
         }
     });
+    imgLayout->addWidget(smoothBtn);
+
+    QRadioButton* pixelBtn = new QRadioButton("像素模式 (显示像素点)", imgGroup);
+    pixelBtn->setChecked(!smooth);
     connect(pixelBtn, &QRadioButton::toggled, this, [this](bool checked) {
         if (checked) {
             QSettings s;
@@ -150,30 +125,18 @@ void SettingsPanel::setupAppearancePage()
             emit imageScalingChanged(false);
         }
     });
-
-    imgLayout->addWidget(smoothBtn);
     imgLayout->addWidget(pixelBtn);
-    layout->addWidget(imgGroup);
 
+    layout->addWidget(imgGroup);
     layout->addStretch();
-    scroll->setWidget(page);
-    m_contentStack->addWidget(scroll);
 }
 
-void SettingsPanel::setupFileAssocPage()
+void SettingsPanel::setupFileAssocPage(QWidget* page)
 {
-    QWidget* page = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16),
-                                DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16));
-    layout->setSpacing(DPIAdapter::scaledSize(8));
-
-    QLabel* title = new QLabel("文件关联", page);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(12));
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    layout->addWidget(title);
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
+    layout->setSpacing(DPIAdapter::scaledSize(12));
 
     QLabel* desc = new QLabel("选择需要用 Firefly Player 打开的文件格式", page);
     desc->setWordWrap(true);
@@ -187,7 +150,7 @@ void SettingsPanel::setupFileAssocPage()
     scrollArea->setFrameShape(QFrame::NoFrame);
     QWidget* scrollContent = new QWidget();
     QVBoxLayout* scrollLayout = new QVBoxLayout(scrollContent);
-    scrollLayout->setSpacing(DPIAdapter::scaledSize(10));
+    scrollLayout->setSpacing(DPIAdapter::scaledSize(12));
 
     FileAssociation* fa = FileAssociation::instance();
 
@@ -227,24 +190,14 @@ void SettingsPanel::setupFileAssocPage()
     scrollLayout->addStretch();
     scrollArea->setWidget(scrollContent);
     layout->addWidget(scrollArea, 1);
-
-    m_contentStack->addWidget(page);
 }
 
-void SettingsPanel::setupPluginsPage()
+void SettingsPanel::setupPluginsPage(QWidget* page)
 {
-    QWidget* page = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16),
-                                DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16));
-    layout->setSpacing(DPIAdapter::scaledSize(8));
-
-    QLabel* title = new QLabel("格式支持包", page);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(12));
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    layout->addWidget(title);
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
+    layout->setSpacing(DPIAdapter::scaledSize(12));
 
     QLabel* desc = new QLabel("管理可选的格式支持包，按需安装以支持更多格式", page);
     desc->setWordWrap(true);
@@ -266,9 +219,9 @@ void SettingsPanel::setupPluginsPage()
     foreach (const PluginInfo& plugin, plugins) {
         QFrame* pluginFrame = new QFrame(scrollContent);
         pluginFrame->setFrameShape(QFrame::StyledPanel);
-        pluginFrame->setStyleSheet("QFrame { border: 1px solid #444444; border-radius: 6px; padding: 8px; }");
+        pluginFrame->setStyleSheet("QFrame { border: 1px solid #444444; border-radius: 6px; padding: 12px; }");
         QVBoxLayout* pluginLayout = new QVBoxLayout(pluginFrame);
-        pluginLayout->setSpacing(DPIAdapter::scaledSize(4));
+        pluginLayout->setSpacing(DPIAdapter::scaledSize(6));
 
         QHBoxLayout* headerLayout = new QHBoxLayout();
         QLabel* nameLabel = new QLabel(plugin.name, pluginFrame);
@@ -309,32 +262,18 @@ void SettingsPanel::setupPluginsPage()
     scrollLayout->addStretch();
     scrollArea->setWidget(scrollContent);
     layout->addWidget(scrollArea, 1);
-
-    m_contentStack->addWidget(page);
 }
 
-void SettingsPanel::setupPlaybackPage()
+void SettingsPanel::setupPlaybackPage(QWidget* page)
 {
-    QScrollArea* scroll = new QScrollArea(this);
-    scroll->setWidgetResizable(true);
-    scroll->setFrameShape(QFrame::NoFrame);
-
-    QWidget* page = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16),
-                                DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16));
-    layout->setSpacing(DPIAdapter::scaledSize(12));
-
-    QLabel* title = new QLabel("播放设置", page);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(12));
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    layout->addWidget(title);
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
+    layout->setSpacing(DPIAdapter::scaledSize(16));
 
     QGroupBox* speedGroup = new QGroupBox("默认播放速度", page);
     QVBoxLayout* speedLayout = new QVBoxLayout(speedGroup);
-    speedLayout->setSpacing(DPIAdapter::scaledSize(6));
+    speedLayout->setSpacing(DPIAdapter::scaledSize(8));
 
     QComboBox* speedCombo = new QComboBox(speedGroup);
     QStringList speeds = {"0.1x", "0.5x", "0.75x", "1.0x", "1.25x", "1.5x", "1.75x", "2.0x", "5.0x"};
@@ -345,7 +284,8 @@ void SettingsPanel::setupPlaybackPage()
 
     QGroupBox* volGroup = new QGroupBox("音量增强", page);
     QVBoxLayout* volLayout = new QVBoxLayout(volGroup);
-    volLayout->setSpacing(DPIAdapter::scaledSize(6));
+    volLayout->setSpacing(DPIAdapter::scaledSize(8));
+
     QCheckBox* volBoostCb = new QCheckBox("启用音量增强（最高500%）", volGroup);
     volBoostCb->setChecked(false);
     volLayout->addWidget(volBoostCb);
@@ -355,27 +295,17 @@ void SettingsPanel::setupPlaybackPage()
     volDescFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
     volDesc->setFont(volDescFont);
     volLayout->addWidget(volDesc);
-    layout->addWidget(volGroup);
 
+    layout->addWidget(volGroup);
     layout->addStretch();
-    scroll->setWidget(page);
-    m_contentStack->addWidget(scroll);
 }
 
-void SettingsPanel::setupShortcutsPage()
+void SettingsPanel::setupShortcutsPage(QWidget* page)
 {
-    QWidget* page = new QWidget();
     QVBoxLayout* layout = new QVBoxLayout(page);
-    layout->setContentsMargins(DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16),
-                                DPIAdapter::scaledSize(16), DPIAdapter::scaledSize(16));
+    layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
+                                DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
     layout->setSpacing(DPIAdapter::scaledSize(8));
-
-    QLabel* title = new QLabel("快捷键", page);
-    QFont titleFont = title->font();
-    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(12));
-    titleFont.setBold(true);
-    title->setFont(titleFont);
-    layout->addWidget(title);
 
     struct Shortcut { QString key; QString desc; };
     QList<Shortcut> shortcuts = {
@@ -400,13 +330,13 @@ void SettingsPanel::setupShortcutsPage()
     foreach (const Shortcut& sc, shortcuts) {
         QFrame* row = new QFrame(scrollContent);
         QHBoxLayout* rowLayout = new QHBoxLayout(row);
-        rowLayout->setContentsMargins(0, 4, 0, 4);
+        rowLayout->setContentsMargins(0, 6, 0, 6);
 
         QLabel* keyLabel = new QLabel(sc.key, row);
         keyLabel->setStyleSheet(
-            "background: #3A3A3A; padding: 4px 12px; border-radius: 4px; font-family: monospace;"
+            "background: #3A3A3A; padding: 4px 14px; border-radius: 4px; font-family: monospace;"
         );
-        keyLabel->setFixedWidth(DPIAdapter::scaledSize(120));
+        keyLabel->setFixedWidth(DPIAdapter::scaledSize(140));
         keyLabel->setAlignment(Qt::AlignCenter);
         rowLayout->addWidget(keyLabel);
 
@@ -419,6 +349,4 @@ void SettingsPanel::setupShortcutsPage()
     scrollLayout->addStretch();
     scrollArea->setWidget(scrollContent);
     layout->addWidget(scrollArea, 1);
-
-    m_contentStack->addWidget(page);
 }

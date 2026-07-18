@@ -182,8 +182,8 @@ void ThemeManager::loadStyleSheet()
     // 注意：不在 QSS 中写死 font-size，字体大小由 DPIAdapter 统一管理，
     // 避免与 DPI 缩放叠加导致字体过大。
     m_styleSheet = QString(
-        "QWidget { background-color: %1; color: %2; }"
-        "QMainWindow { background-color: %1; }"
+        "QWidget { background-color: %1; color: %2; font-size: 13pt; }"
+        "QMainWindow { background-color: transparent; }"
         "QHeaderBar { background-color: %6; border-bottom: 1px solid %4; }"
         "QPushButton { background-color: transparent; border: none; padding: 6px; border-radius: 4px; color: %2; }"
         "QPushButton:hover { background-color: %5; }"

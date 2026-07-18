@@ -14,6 +14,7 @@ public:
     ~HeaderBar();
 
     void setTitle(const QString& title);
+    void updateMaximizeIcon(bool isMaximized);
 
 signals:
     void openFileClicked();

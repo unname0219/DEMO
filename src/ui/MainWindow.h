@@ -29,6 +29,8 @@ protected:
     void moveEvent(QMoveEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void openFileDialog();
@@ -46,6 +48,7 @@ private:
     void updateLayoutForMediaType(MediaType type);
     void repositionSettingsPanel();
     QString findAdjacentFile(const QString& currentPath, int direction);
+    void updateResizeCursor(int x, int y);
 
     HeaderBar* m_headerBar;
     MediaViewer* m_mediaViewer;

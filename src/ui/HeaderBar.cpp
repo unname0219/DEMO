@@ -52,15 +52,13 @@ void HeaderBar::setupUI()
     layout->addWidget(brandLabel);
 
     m_openFileBtn = new QPushButton(this);
-    int btnIconSize = DPIAdapter::scaledSize(16);
+    int btnIconSize = DPIAdapter::scaledSize(20);
+    m_openFileBtn->setFixedSize(DPIAdapter::scaledSize(32), DPIAdapter::scaledSize(28));
     m_openFileBtn->setIconSize(QSize(btnIconSize, btnIconSize));
-    m_openFileBtn->setText("打开文件");
-    QFont openFont = m_openFileBtn->font();
-    openFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
-    m_openFileBtn->setFont(openFont);
+    m_openFileBtn->setToolTip("打开文件");
     m_openFileBtn->setCursor(Qt::PointingHandCursor);
     m_openFileBtn->setStyleSheet(
-        "QPushButton { padding: 4px 12px; border-radius: 4px; }"
+        "QPushButton { padding: 0; border-radius: 4px; }"
         "QPushButton:hover { background-color: rgba(0,212,170,40); }"
     );
     connect(m_openFileBtn, &QPushButton::clicked, this, &HeaderBar::openFileClicked);
@@ -114,12 +112,21 @@ void HeaderBar::setupUI()
 
 void HeaderBar::refreshIcons()
 {
-    // Logo 保留原色
     m_logoLabel->setPixmap(IconManager::instance()->icon("logo", false).pixmap(m_logoLabel->size()));
     m_openFileBtn->setIcon(IconManager::instance()->icon("open-file"));
     m_minimizeBtn->setIcon(IconManager::instance()->icon("minimize"));
-    m_maximizeBtn->setIcon(IconManager::instance()->icon("maximize"));
     m_closeBtn->setIcon(IconManager::instance()->icon("close"));
+}
+
+void HeaderBar::updateMaximizeIcon(bool isMaximized)
+{
+    if (isMaximized) {
+        m_maximizeBtn->setIcon(IconManager::instance()->icon("restore"));
+        m_maximizeBtn->setToolTip("还原");
+    } else {
+        m_maximizeBtn->setIcon(IconManager::instance()->icon("maximize"));
+        m_maximizeBtn->setToolTip("最大化");
+    }
 }
 
 void HeaderBar::setTitle(const QString& title)

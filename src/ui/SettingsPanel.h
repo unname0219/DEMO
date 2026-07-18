@@ -1,11 +1,10 @@
 #ifndef SETTINGSPANEL_H
 #define SETTINGSPANEL_H
 
-#include <QWidget>
-#include <QListWidget>
-#include <QStackedWidget>
+#include <QDialog>
+#include <QTabWidget>
 
-class SettingsPanel : public QWidget
+class SettingsPanel : public QDialog
 {
     Q_OBJECT
 
@@ -14,22 +13,17 @@ public:
     ~SettingsPanel();
 
 signals:
-    // 图片缩放模式改变时立即发出，由 ImageViewer 实时响应（无需重启）
     void imageScalingChanged(bool smooth);
-
-private slots:
-    void onCategoryChanged(int row);
 
 private:
     void setupUI();
-    void setupAppearancePage();
-    void setupFileAssocPage();
-    void setupPluginsPage();
-    void setupPlaybackPage();
-    void setupShortcutsPage();
+    void setupAppearancePage(QWidget* page);
+    void setupFileAssocPage(QWidget* page);
+    void setupPluginsPage(QWidget* page);
+    void setupPlaybackPage(QWidget* page);
+    void setupShortcutsPage(QWidget* page);
 
-    QListWidget* m_categoryList;
-    QStackedWidget* m_contentStack;
+    QTabWidget* m_tabWidget;
 };
 
 #endif

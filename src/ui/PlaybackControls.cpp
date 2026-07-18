@@ -54,13 +54,13 @@ void PlaybackControls::setupUI()
     // 播放/暂停（居中，保留原图渐变色，不染色）
     m_playPauseBtn = new QPushButton(this);
     m_playPauseBtn->setFixedSize(playBtnSize, playBtnSize);
-    m_playPauseBtn->setIconSize(QSize(playBtnSize - DPIAdapter::scaledSize(10),
-                                      playBtnSize - DPIAdapter::scaledSize(10)));
+    m_playPauseBtn->setIconSize(QSize(playBtnSize - DPIAdapter::scaledSize(8),
+                                      playBtnSize - DPIAdapter::scaledSize(8)));
     m_playPauseBtn->setCursor(Qt::PointingHandCursor);
     m_playPauseBtn->setStyleSheet(
-        "QPushButton { background-color: rgba(0,212,170,30); border: none; border-radius: 20px; }"
-        "QPushButton:hover { background-color: rgba(0,212,170,60); }"
-        "QPushButton:pressed { background-color: rgba(0,212,170,90); }"
+        "QPushButton { background-color: transparent; border: none; }"
+        "QPushButton:hover { background-color: rgba(255,255,255,10); }"
+        "QPushButton:pressed { background-color: rgba(255,255,255,20); }"
     );
     connect(m_playPauseBtn, &QPushButton::clicked, this, &PlaybackControls::playToggled);
     layout->addWidget(m_playPauseBtn);

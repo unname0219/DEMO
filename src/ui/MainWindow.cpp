@@ -47,7 +47,7 @@ MainWindow::MainWindow(QWidget* parent)
 
     // 去掉 Windows 原生标题栏，使用自定义标题栏
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
-    setAttribute(Qt::WA_TranslucentBackground, false);
+    setAttribute(Qt::WA_TranslucentBackground, true);
 
     setAcceptDrops(true);
     setMouseTracking(true);
@@ -123,22 +123,27 @@ void MainWindow::setupUI()
 
     mainLayout->addWidget(m_controlBar);
 
-    // 设置面板：作为独立的顶层 Tool 窗口（以主窗口为 owner），
-    // 避免被视频原生渲染层遮挡，同时跟随主窗口最小化/关闭。
+    // 设置面板：居中对话框模式，modal 防止与主窗口交互冲突
     m_settingsPanel = new SettingsPanel(this);
-    m_settingsPanel->setWindowFlag(Qt::Tool, true);
-    m_settingsPanel->setWindowFlag(Qt::FramelessWindowHint, true);
     m_settingsPanel->setVisible(false);
 }
 
 void MainWindow::setupConnections()
 {
+    m_mediaViewer->installEventFilter(this);
+    m_progressBar->installEventFilter(this);
+    m_controlBar->installEventFilter(this);
+
     connect(m_headerBar, &HeaderBar::openFileClicked, this, &MainWindow::openFileDialog);
     connect(m_headerBar, &HeaderBar::minimizeClicked, this, &QMainWindow::showMinimized);
     connect(m_headerBar, &HeaderBar::maximizeClicked, this, [this]() {
         if (isMaximized()) showNormal(); else showMaximized();
     });
     connect(m_headerBar, &HeaderBar::closeClicked, this, &QMainWindow::close);
+
+    connect(this, &QMainWindow::windowStateChanged, this, [this](Qt::WindowStates state) {
+        m_headerBar->updateMaximizeIcon(state & Qt::WindowMaximized);
+    });
 
     connect(m_playbackControls, &PlaybackControls::playToggled,
             m_playerController, &PlayerController::togglePlayPause);
@@ -278,7 +283,8 @@ void MainWindow::toggleSettings()
     if (m_settingsPanel->isVisible()) {
         m_settingsPanel->hide();
     } else {
-        repositionSettingsPanel();
+        m_settingsPanel->move((width() - m_settingsPanel->width()) / 2,
+                              (height() - m_settingsPanel->height()) / 2);
         m_settingsPanel->show();
         m_settingsPanel->raise();
         m_settingsPanel->activateWindow();
@@ -404,16 +410,25 @@ void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
     if (m_settingsPanel && m_settingsPanel->isVisible()) {
-        repositionSettingsPanel();
+        m_settingsPanel->move((width() - m_settingsPanel->width()) / 2,
+                              (height() - m_settingsPanel->height()) / 2);
     }
 }
 
 void MainWindow::moveEvent(QMoveEvent* event)
 {
     QMainWindow::moveEvent(event);
-    if (m_settingsPanel && m_settingsPanel->isVisible()) {
-        repositionSettingsPanel();
-    }
+}
+
+void MainWindow::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    QColor bg = ThemeManager::instance()->backgroundColor();
+    painter.setBrush(QBrush(bg));
+    painter.setPen(Qt::NoPen);
+    painter.drawRoundedRect(rect(), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
 }
 
 // 无边框窗口的边缘拉伸：检测鼠标是否在窗口边缘，触发系统级缩放
@@ -439,22 +454,35 @@ void MainWindow::mousePressEvent(QMouseEvent* event)
     QMainWindow::mousePressEvent(event);
 }
 
+bool MainWindow::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::MouseMove && !isMaximized() && !m_isFullScreen) {
+        QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
+        QPoint globalPos = mouseEvent->globalPosition().toPoint();
+        QPoint localPos = mapFromGlobal(globalPos);
+        updateResizeCursor(localPos.x(), localPos.y());
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
+void MainWindow::updateResizeCursor(int x, int y)
+{
+    int bw = DPIAdapter::scaledSize(kResizeBorder);
+    bool left = x >= 0 && x < bw;
+    bool right = x <= width() && x > width() - bw;
+    bool top = y >= 0 && y < bw;
+    bool bottom = y <= height() && y > height() - bw;
+    if ((left && top) || (right && bottom)) setCursor(Qt::SizeFDiagCursor);
+    else if ((right && top) || (left && bottom)) setCursor(Qt::SizeBDiagCursor);
+    else if (left || right) setCursor(Qt::SizeHorCursor);
+    else if (top || bottom) setCursor(Qt::SizeVerCursor);
+    else setCursor(Qt::ArrowCursor);
+}
+
 void MainWindow::mouseMoveEvent(QMouseEvent* event)
 {
-    // 在边缘显示对应的缩放光标
     if (!isMaximized() && !m_isFullScreen) {
-        int x = event->position().x();
-        int y = event->position().y();
-        int bw = kResizeBorder;
-        bool left = x < bw;
-        bool right = x > width() - bw;
-        bool top = y < bw;
-        bool bottom = y > height() - bw;
-        if ((left && top) || (right && bottom)) setCursor(Qt::SizeFDiagCursor);
-        else if ((right && top) || (left && bottom)) setCursor(Qt::SizeBDiagCursor);
-        else if (left || right) setCursor(Qt::SizeHorCursor);
-        else if (top || bottom) setCursor(Qt::SizeVerCursor);
-        else setCursor(Qt::ArrowCursor);
+        updateResizeCursor(event->position().x(), event->position().y());
     }
     QMainWindow::mouseMoveEvent(event);
 }
