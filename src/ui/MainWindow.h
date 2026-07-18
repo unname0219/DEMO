@@ -56,6 +56,8 @@ private:
     void showControls();
     void hideControls();
     void showFileInfoMenu(const QPoint& pos);
+    void checkFileAssociations();
+    void showNotification(const QString& title, const QString& message);
 
     HeaderBar* m_headerBar;
     MediaViewer* m_mediaViewer;

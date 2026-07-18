@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QStackedLayout>
+#include <QMediaPlayer>
 #include "core/FileSignatureDetector.h"
 
 class VideoPlayer;
@@ -21,8 +22,8 @@ public:
     void clear();
 
     MediaType currentMediaType() const;
-    // 转发图片缩放模式设置（立即生效）
     void setSmoothScaling(bool smooth);
+    void setVideoScalingMode(Qt::AspectRatioMode mode);
 
 private:
     void setupUI();

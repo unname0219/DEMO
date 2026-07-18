@@ -2,7 +2,6 @@
 #include "managers/DPIAdapter.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QLabel>
 #include <QPushButton>
 #include <QDir>
 #include <QFileInfo>
@@ -12,7 +11,6 @@
 
 ImageViewer::ImageViewer(QWidget* parent)
     : QWidget(parent)
-    , m_imageLabel(nullptr)
     , m_prevBtn(nullptr)
     , m_nextBtn(nullptr)
     , m_scaleFactor(1.0)
@@ -46,10 +44,10 @@ void ImageViewer::setupUI()
     connect(m_prevBtn, &QPushButton::clicked, this, &ImageViewer::showPrevious);
     mainLayout->addWidget(m_prevBtn);
 
-    m_imageLabel = new QLabel(this);
-    m_imageLabel->setAlignment(Qt::AlignCenter);
-    m_imageLabel->setStyleSheet("background: transparent;");
-    mainLayout->addWidget(m_imageLabel, 1);
+    QWidget* viewport = new QWidget(this);
+    viewport->setMouseTracking(true);
+    viewport->installEventFilter(this);
+    mainLayout->addWidget(viewport, 1);
 
     m_nextBtn = new QPushButton("▶", this);
     m_nextBtn->setFixedWidth(DPIAdapter::scaledSize(48));
@@ -71,9 +69,27 @@ void ImageViewer::loadImage(const QString& filePath)
     m_currentPath = filePath;
     m_originalImage.load(filePath);
     m_scaleFactor = 1.0;
+    m_imageOffset = QPoint(0, 0);
     scanFolder();
-    updateDisplay();
+    centerImage();
+    update();
     updateNavButtons();
+}
+
+void ImageViewer::centerImage()
+{
+    if (m_originalImage.isNull()) return;
+    
+    int scaledWidth = qRound(m_originalImage.width() * m_scaleFactor);
+    int scaledHeight = qRound(m_originalImage.height() * m_scaleFactor);
+    
+    int viewWidth = width() - m_prevBtn->width() - m_nextBtn->width();
+    int viewHeight = height();
+    
+    int offsetX = (viewWidth - scaledWidth) / 2 + m_prevBtn->width();
+    int offsetY = (viewHeight - scaledHeight) / 2;
+    
+    m_imageOffset = QPoint(offsetX, offsetY);
 }
 
 void ImageViewer::scanFolder()
@@ -90,22 +106,29 @@ void ImageViewer::scanFolder()
     if (m_currentIndex < 0) m_currentIndex = 0;
 }
 
-void ImageViewer::updateDisplay()
+void ImageViewer::paintEvent(QPaintEvent* event)
 {
-    if (m_originalImage.isNull()) return;
-
-    int newWidth = qRound(m_originalImage.width() * m_scaleFactor);
-    int newHeight = qRound(m_originalImage.height() * m_scaleFactor);
-
+    Q_UNUSED(event);
+    
+    QPainter painter(this);
+    
+    if (m_originalImage.isNull()) {
+        painter.setPen(QColor(0x88, 0x88, 0x88));
+        painter.drawText(rect(), Qt::AlignCenter, "图片加载失败");
+        return;
+    }
+    
     Qt::TransformationMode mode = m_smoothScaling
         ? Qt::SmoothTransformation
         : Qt::FastTransformation;
-
-    QImage scaledImage = m_originalImage.scaled(newWidth, newHeight, Qt::KeepAspectRatio, mode);
-    QPixmap scaled = QPixmap::fromImage(scaledImage);
-    m_imageLabel->setPixmap(scaled);
-    m_imageLabel->setAlignment(Qt::AlignCenter);
-    m_imageLabel->setGeometry(m_imageOffset.x(), m_imageOffset.y(), width(), height());
+    
+    int scaledWidth = qRound(m_originalImage.width() * m_scaleFactor);
+    int scaledHeight = qRound(m_originalImage.height() * m_scaleFactor);
+    
+    QImage scaledImage = m_originalImage.scaled(scaledWidth, scaledHeight, 
+                                                 Qt::KeepAspectRatio, mode);
+    
+    painter.drawImage(m_imageOffset, scaledImage);
 }
 
 void ImageViewer::updateNavButtons()
@@ -132,22 +155,46 @@ void ImageViewer::showNext()
     loadImage(newPath);
 }
 
-void ImageViewer::zoomIn()
+void ImageViewer::zoomIn(const QPoint& mousePos)
 {
+    double oldScale = m_scaleFactor;
     m_scaleFactor = qMin(m_scaleFactor * 1.2, 10.0);
-    updateDisplay();
+    adjustOffset(mousePos, oldScale);
+    update();
 }
 
-void ImageViewer::zoomOut()
+void ImageViewer::zoomOut(const QPoint& mousePos)
 {
+    double oldScale = m_scaleFactor;
     m_scaleFactor = qMax(m_scaleFactor / 1.2, 0.1);
-    updateDisplay();
+    adjustOffset(mousePos, oldScale);
+    
+    if (m_scaleFactor <= 1.0) {
+        m_scaleFactor = 1.0;
+        centerImage();
+    }
+    update();
+}
+
+void ImageViewer::adjustOffset(const QPoint& mousePos, double oldScale)
+{
+    if (m_originalImage.isNull()) return;
+    
+    double imgX = (mousePos.x() - m_imageOffset.x()) / oldScale;
+    double imgY = (mousePos.y() - m_imageOffset.y()) / oldScale;
+    
+    int newOffsetX = mousePos.x() - qRound(imgX * m_scaleFactor);
+    int newOffsetY = mousePos.y() - qRound(imgY * m_scaleFactor);
+    
+    m_imageOffset.setX(newOffsetX);
+    m_imageOffset.setY(newOffsetY);
 }
 
 void ImageViewer::resetZoom()
 {
     m_scaleFactor = 1.0;
-    updateDisplay();
+    centerImage();
+    update();
 }
 
 void ImageViewer::setSmoothScaling(bool enabled)
@@ -155,7 +202,7 @@ void ImageViewer::setSmoothScaling(bool enabled)
     m_smoothScaling = enabled;
     QSettings settings;
     settings.setValue("image/smoothScaling", enabled);
-    updateDisplay();
+    update();
 }
 
 bool ImageViewer::smoothScaling() const
@@ -166,15 +213,19 @@ bool ImageViewer::smoothScaling() const
 void ImageViewer::wheelEvent(QWheelEvent* event)
 {
     if (event->angleDelta().y() > 0) {
-        zoomIn();
+        zoomIn(event->position().toPoint());
     } else {
-        zoomOut();
+        zoomOut(event->position().toPoint());
     }
 }
 
 void ImageViewer::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
+    if (m_scaleFactor <= 1.0 && !m_originalImage.isNull()) {
+        centerImage();
+        update();
+    }
 }
 
 void ImageViewer::keyPressEvent(QKeyEvent* event)
@@ -184,7 +235,7 @@ void ImageViewer::keyPressEvent(QKeyEvent* event)
 
 void ImageViewer::mousePressEvent(QMouseEvent* event)
 {
-    if (event->button() == Qt::LeftButton && m_scaleFactor > 1.0) {
+    if (event->button() == Qt::LeftButton) {
         m_isDragging = true;
         m_lastMousePos = event->pos();
         setCursor(Qt::ClosedHandCursor);
@@ -198,7 +249,7 @@ void ImageViewer::mouseMoveEvent(QMouseEvent* event)
         QPoint delta = event->pos() - m_lastMousePos;
         m_imageOffset += delta;
         m_lastMousePos = event->pos();
-        updateDisplay();
+        update();
     }
     QWidget::mouseMoveEvent(event);
 }
@@ -210,4 +261,20 @@ void ImageViewer::mouseReleaseEvent(QMouseEvent* event)
         setCursor(Qt::ArrowCursor);
     }
     QWidget::mouseReleaseEvent(event);
+}
+
+bool ImageViewer::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::Wheel) {
+        QWheelEvent* wheelEvent = static_cast<QWheelEvent*>(event);
+        QPoint globalPos = wheelEvent->globalPosition().toPoint();
+        QPoint localPos = mapFromGlobal(globalPos);
+        if (wheelEvent->angleDelta().y() > 0) {
+            zoomIn(localPos);
+        } else {
+            zoomOut(localPos);
+        }
+        return true;
+    }
+    return QWidget::eventFilter(obj, event);
 }

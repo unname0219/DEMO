@@ -5,7 +5,6 @@
 #include <QImage>
 #include <QStringList>
 
-class QLabel;
 class QPushButton;
 
 class ImageViewer : public QWidget
@@ -27,12 +26,14 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
+    bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
     void showPrevious();
     void showNext();
-    void zoomIn();
-    void zoomOut();
+    void zoomIn(const QPoint& mousePos = QPoint());
+    void zoomOut(const QPoint& mousePos = QPoint());
     void resetZoom();
 
 private:
@@ -40,8 +41,9 @@ private:
     void updateDisplay();
     void scanFolder();
     void updateNavButtons();
+    void adjustOffset(const QPoint& mousePos, double oldScale);
+    void centerImage();
 
-    QLabel* m_imageLabel;
     QPushButton* m_prevBtn;
     QPushButton* m_nextBtn;
 

@@ -130,3 +130,13 @@ jobs:
           files: build/bin/FireflyPlayer-Windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to Gitee
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git remote add gitee https://${{ secrets.GITEE_USERNAME }}:${{ secrets.GITEE_TOKEN }}@gitee.com/unname0219/DEMO.git
+          git fetch gitee
+          git push gitee main --force
+          git push gitee --tags

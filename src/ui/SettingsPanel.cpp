@@ -36,8 +36,11 @@ void SettingsPanel::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     QColor bg = ThemeManager::instance()->backgroundColor();
     painter.setBrush(QBrush(bg));
-    painter.setPen(Qt::NoPen);
-    painter.drawRoundedRect(rect(), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+    QPen borderPen(QColor(0, 200, 100));
+    borderPen.setWidth(1);
+    painter.setPen(borderPen);
+    painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 
+                            DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
 }
 
 SettingsPanel::~SettingsPanel()
@@ -83,13 +86,27 @@ void SettingsPanel::setupUI()
     mainLayout->addWidget(titleBar);
 
     m_tabWidget = new QTabWidget(this);
-    m_tabWidget->setTabPosition(QTabWidget::West);
+    m_tabWidget->setTabPosition(QTabWidget::North);
     m_tabWidget->setDocumentMode(true);
-    m_tabWidget->setStyleSheet(
-        "QTabWidget::pane { border: none; background: transparent; }"
-        "QTabWidget::tab-bar { alignment: left; }"
-        "QTabBar::tab { width: 100px; height: 40px; }"
+    QString tabStyle = QString(
+        "QTabWidget::pane { border: 1px solid %3; border-top: none; background: transparent; border-radius: 0 0 6px 6px; }"
+        "QTabWidget::tab-bar { alignment: center; }"
+        "QTabBar::tab { height: %4px; min-width: %5px; "
+        "background: transparent; color: %1; padding: 0 %6px; margin-right: 2px; "
+        "border: 1px solid transparent; border-bottom: none; border-radius: %7px %7px 0 0; }"
+        "QTabBar::tab:selected { background: rgba(0,212,170,20); color: %2; "
+        "border: 1px solid %3; border-bottom: none; }"
+        "QTabBar::tab:hover { background: rgba(0,212,170,10); }"
+    ).arg(
+        ThemeManager::instance()->textColor(),
+        ThemeManager::instance()->primaryColor(),
+        ThemeManager::instance()->borderColor(),
+        QString::number(DPIAdapter::scaledSize(36)),
+        QString::number(DPIAdapter::scaledSize(70)),
+        QString::number(DPIAdapter::scaledSize(12)),
+        QString::number(DPIAdapter::scaledSize(4))
     );
+    m_tabWidget->setStyleSheet(tabStyle);
     mainLayout->addWidget(m_tabWidget);
 
     QWidget* appearancePage = new QWidget();
@@ -325,6 +342,37 @@ void SettingsPanel::setupPlaybackPage(QWidget* page)
     layout->setContentsMargins(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16),
                                 DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
     layout->setSpacing(DPIAdapter::scaledSize(16));
+
+    QGroupBox* videoGroup = new QGroupBox("视频缩放", page);
+    QVBoxLayout* videoLayout = new QVBoxLayout(videoGroup);
+    videoLayout->setSpacing(DPIAdapter::scaledSize(8));
+
+    QSettings settings;
+    bool keepAspectRatio = settings.value("video/keepAspectRatio", true).toBool();
+
+    QRadioButton* fitBtn = new QRadioButton("保持原宽高（完整显示）", videoGroup);
+    fitBtn->setChecked(keepAspectRatio);
+    connect(fitBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("video/keepAspectRatio", true);
+            emit videoScalingModeChanged(Qt::KeepAspectRatio);
+        }
+    });
+    videoLayout->addWidget(fitBtn);
+
+    QRadioButton* stretchBtn = new QRadioButton("拉伸铺满窗口", videoGroup);
+    stretchBtn->setChecked(!keepAspectRatio);
+    connect(stretchBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("video/keepAspectRatio", false);
+            emit videoScalingModeChanged(Qt::IgnoreAspectRatio);
+        }
+    });
+    videoLayout->addWidget(stretchBtn);
+
+    layout->addWidget(videoGroup);
 
     QGroupBox* speedGroup = new QGroupBox("默认播放速度", page);
     QVBoxLayout* speedLayout = new QVBoxLayout(speedGroup);

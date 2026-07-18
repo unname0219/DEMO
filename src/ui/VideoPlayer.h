@@ -2,6 +2,7 @@
 #define VIDEOPLAYER_H
 
 #include <QWidget>
+#include <QMediaPlayer>
 
 class QVideoWidget;
 class PlayerController;
@@ -15,12 +16,14 @@ public:
     ~VideoPlayer();
 
     void setMediaPlayer(PlayerController* controller);
+    void setVideoScalingMode(Qt::AspectRatioMode mode);
 
 private:
     void setupUI();
 
     QVideoWidget* m_videoWidget;
     PlayerController* m_controller;
+    Qt::AspectRatioMode m_scalingMode;
 };
 
 #endif

@@ -80,6 +80,13 @@ void MediaViewer::setSmoothScaling(bool smooth)
     }
 }
 
+void MediaViewer::setVideoScalingMode(Qt::AspectRatioMode mode)
+{
+    if (m_videoPlayer) {
+        m_videoPlayer->setVideoScalingMode(mode);
+    }
+}
+
 void MediaViewer::clear()
 {
     m_currentType = MediaType::Unknown;

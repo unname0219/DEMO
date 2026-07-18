@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include <QTabWidget>
+#include <QMediaPlayer>
 
 class SettingsPanel : public QDialog
 {
@@ -14,6 +15,7 @@ public:
 
 signals:
     void imageScalingChanged(bool smooth);
+    void videoScalingModeChanged(Qt::AspectRatioMode mode);
 
 protected:
     void paintEvent(QPaintEvent* event) override;

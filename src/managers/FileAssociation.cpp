@@ -1,5 +1,7 @@
 #include "managers/FileAssociation.h"
 #include <QSettings>
+#include <QCoreApplication>
+#include <QStandardPaths>
 
 FileAssociation* FileAssociation::s_instance = nullptr;
 
@@ -63,10 +65,83 @@ void FileAssociation::clearAssociations()
 
 void FileAssociation::registerAssociations()
 {
+    QString exePath = QCoreApplication::applicationFilePath();
+    QString progId = "FireflyPlayer";
+
+    QSettings progIdSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(progId),
+                            QSettings::NativeFormat);
+    progIdSettings.setValue(".Default", "Firefly Player");
+    progIdSettings.setValue("FriendlyTypeName", "Firefly Player");
+
+    progIdSettings.beginGroup("shell");
+    progIdSettings.beginGroup("open");
+    progIdSettings.beginGroup("command");
+    progIdSettings.setValue(".Default", QString("\"%1\" \"%2\"").arg(exePath, "%1"));
+    progIdSettings.endGroup();
+    progIdSettings.endGroup();
+    progIdSettings.endGroup();
+
+    QStringList allFormats = m_videoFormats + m_audioFormats + m_imageFormats;
+    foreach (const QString& ext, allFormats) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        extSettings.setValue(".Default", progId);
+
+        QSettings openWithSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1\\OpenWithProgIDs")
+                                   .arg(extKey), QSettings::NativeFormat);
+        openWithSettings.setValue(progId, "");
+
+        QSettings choiceSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1\\OpenWithList")
+                                 .arg(extKey), QSettings::NativeFormat);
+        choiceSettings.setValue(progId, "");
+    }
+
+    QSettings appUserModelSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1\\Application")
+                                   .arg(progId), QSettings::NativeFormat);
+    appUserModelSettings.setValue("AppUserModelId", "FireflyPlayer");
+
+    QSettings iconSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1\\DefaultIcon")
+                           .arg(progId), QSettings::NativeFormat);
+    iconSettings.setValue(".Default", QString("\"%1\",0").arg(exePath));
 }
 
 void FileAssociation::unregisterAssociations()
 {
+    QString progId = "FireflyPlayer";
+
+    QStringList allFormats = m_videoFormats + m_audioFormats + m_imageFormats;
+    foreach (const QString& ext, allFormats) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        QString currentProgId = extSettings.value(".Default").toString();
+        if (currentProgId == progId) {
+            extSettings.remove(".Default");
+        }
+
+        QSettings openWithSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1\\OpenWithProgIDs")
+                                   .arg(extKey), QSettings::NativeFormat);
+        openWithSettings.remove(progId);
+    }
+}
+
+bool FileAssociation::checkAssociationMatches() const
+{
+    QString progId = "FireflyPlayer";
+    QStringList allFormats = m_videoFormats + m_audioFormats + m_imageFormats;
+
+    foreach (const QString& ext, allFormats) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        QString currentProgId = extSettings.value(".Default").toString();
+        if (currentProgId != progId) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool FileAssociation::isAssociated(const QString& extension) const

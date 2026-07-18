@@ -23,6 +23,7 @@ public:
 
     void registerAssociations();
     void unregisterAssociations();
+    bool checkAssociationMatches() const;
 
     bool isAssociated(const QString& extension) const;
 

@@ -10,6 +10,7 @@
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
 #include "managers/IconManager.h"
+#include "managers/FileAssociation.h"
 #include "utils/FormatUtils.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -51,7 +52,7 @@ MainWindow::MainWindow(QWidget* parent)
 {
     m_playerController = new PlayerController(this);
     m_hideControlsTimer = new QTimer(this);
-    m_hideControlsTimer->setInterval(3000);
+    m_hideControlsTimer->setInterval(1000);
     m_hideControlsTimer->setSingleShot(true);
     connect(m_hideControlsTimer, &QTimer::timeout, this, &MainWindow::hideControlsAfterTimeout);
 
@@ -67,6 +68,8 @@ MainWindow::MainWindow(QWidget* parent)
     setupUI();
     setupConnections();
     setupShortcuts();
+
+    checkFileAssociations();
 
     updateWindowTitle(QString());
 }
@@ -96,53 +99,62 @@ void MainWindow::setupUI()
     m_progressBar = new ProgressBar(this);
     mainLayout->addWidget(m_progressBar);
 
-    // 控制栏布局：设置 | stretch | 上一个 | 快退 | 播放(居中) | 快进 | 下一个 | stretch | 倍速 | 音量
     m_controlBar = new QWidget(this);
     m_controlBar->setFixedHeight(DPIAdapter::scaledSize(52));
     m_controlBar->setMouseTracking(true);
     QHBoxLayout* controlLayout = new QHBoxLayout(m_controlBar);
-    controlLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(12), 0);
-    controlLayout->setSpacing(DPIAdapter::scaledSize(8));
+    controlLayout->setContentsMargins(0, 0, 0, 0);
+    controlLayout->setSpacing(0);
 
-    // 设置按钮（居左，图标化）
-    QPushButton* settingsBtn = new QPushButton(m_controlBar);
+    QWidget* leftPanel = new QWidget(m_controlBar);
+    QHBoxLayout* leftLayout = new QHBoxLayout(leftPanel);
+    leftLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, 0, 0);
+    leftLayout->setSpacing(DPIAdapter::scaledSize(8));
+
+    QPushButton* settingsBtn = new QPushButton(leftPanel);
     settingsBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
     settingsBtn->setIconSize(QSize(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(20)));
     settingsBtn->setIcon(IconManager::instance()->icon("settings"));
     settingsBtn->setCursor(Qt::PointingHandCursor);
     settingsBtn->setToolTip("设置");
     connect(settingsBtn, &QPushButton::clicked, this, &MainWindow::toggleSettings);
-    // 主题变化时刷新设置按钮图标
     connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, [settingsBtn]() {
         settingsBtn->setIcon(IconManager::instance()->icon("settings"));
     });
-    controlLayout->addWidget(settingsBtn);
+    leftLayout->addWidget(settingsBtn);
 
-    // 左侧弹性，把播放控制组推到中间
-    controlLayout->addStretch();
+    controlLayout->addWidget(leftPanel);
+
+    controlLayout->addStretch(1);
 
     m_playbackControls = new PlaybackControls(m_controlBar);
-    controlLayout->addWidget(m_playbackControls);
+    controlLayout->addWidget(m_playbackControls, 0, Qt::AlignCenter);
 
-    // 右侧弹性，让播放按钮真正居中
-    controlLayout->addStretch();
+    controlLayout->addStretch(1);
 
-    m_speedSelector = new SpeedSelector(m_controlBar);
-    controlLayout->addWidget(m_speedSelector);
+    QWidget* rightPanel = new QWidget(m_controlBar);
+    QHBoxLayout* rightLayout = new QHBoxLayout(rightPanel);
+    rightLayout->setContentsMargins(0, 0, DPIAdapter::scaledSize(12), 0);
+    rightLayout->setSpacing(DPIAdapter::scaledSize(8));
 
-    m_volumeSlider = new VolumeSlider(m_controlBar);
-    controlLayout->addWidget(m_volumeSlider);
+    m_speedSelector = new SpeedSelector(rightPanel);
+    rightLayout->addWidget(m_speedSelector);
 
-    QPushButton* toolboxBtn = new QPushButton(m_controlBar);
+    m_volumeSlider = new VolumeSlider(rightPanel);
+    rightLayout->addWidget(m_volumeSlider);
+
+    QPushButton* toolboxBtn = new QPushButton(rightPanel);
     toolboxBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
     toolboxBtn->setIconSize(QSize(DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(20)));
     toolboxBtn->setIcon(IconManager::instance()->icon("settings"));
     toolboxBtn->setCursor(Qt::PointingHandCursor);
     toolboxBtn->setToolTip("工具箱");
-    controlLayout->addWidget(toolboxBtn);
+    rightLayout->addWidget(toolboxBtn);
     connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, [toolboxBtn]() {
         toolboxBtn->setIcon(IconManager::instance()->icon("settings"));
     });
+
+    controlLayout->addWidget(rightPanel);
 
     mainLayout->addWidget(m_controlBar);
 
@@ -211,6 +223,10 @@ void MainWindow::setupConnections()
     // 图片缩放模式立即生效
     connect(m_settingsPanel, &SettingsPanel::imageScalingChanged,
             m_mediaViewer, &MediaViewer::setSmoothScaling);
+
+    // 视频缩放模式立即生效
+    connect(m_settingsPanel, &SettingsPanel::videoScalingModeChanged,
+            m_mediaViewer, &MediaViewer::setVideoScalingMode);
 
     connect(ThemeManager::instance(), &ThemeManager::themeChanged,
             this, [this]() { update(); });
@@ -333,21 +349,37 @@ void MainWindow::toggleFullScreen()
 {
     if (m_isFullScreen) {
         showNormal();
-        showControls();
+        setContentsMargins(DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8),
+                           DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+        m_headerBar->show();
+        m_progressBar->show();
+        m_controlBar->show();
+        m_controlBar->setStyleSheet("");
+        m_progressBar->setStyleSheet("");
         m_isFullScreen = false;
     } else {
+        setContentsMargins(0, 0, 0, 0);
         showFullScreen();
-        hideControls();
+        m_headerBar->hide();
+        m_progressBar->hide();
+        m_controlBar->hide();
         m_isFullScreen = true;
     }
 }
 
 void MainWindow::showControls()
 {
+    if (!m_isFullScreen) return;
     m_headerBar->show();
     m_progressBar->show();
     m_controlBar->show();
+    m_controlBar->setStyleSheet(
+        "QWidget { background-color: rgba(0,0,0,0.6); }"
+        "QPushButton { background-color: transparent; }"
+    );
+    m_progressBar->setStyleSheet("QWidget { background-color: rgba(0,0,0,0.6); }");
     m_hideControlsTimer->stop();
+    m_hideControlsTimer->start();
 }
 
 void MainWindow::hideControls()
@@ -618,4 +650,58 @@ void MainWindow::showFileInfoMenu(const QPoint& pos)
     });
 
     menu.exec(pos);
+}
+
+void MainWindow::checkFileAssociations()
+{
+    FileAssociation* fa = FileAssociation::instance();
+    QStringList allFormats = fa->videoFormats() + fa->audioFormats() + fa->imageFormats();
+    
+    if (allFormats.isEmpty()) return;
+
+    if (!fa->checkAssociationMatches()) {
+        showNotification("文件关联", "检测到配置文件与实际文件关联不一致");
+    }
+}
+
+void MainWindow::showNotification(const QString& title, const QString& message)
+{
+    QWidget* notification = new QWidget(this);
+    notification->setFixedWidth(DPIAdapter::scaledSize(320));
+    notification->setFixedHeight(DPIAdapter::scaledSize(80));
+    notification->setStyleSheet(
+        "QWidget { background-color: #2D2D2D; border: 1px solid #444444; border-radius: 8px; }"
+    );
+
+    QVBoxLayout* layout = new QVBoxLayout(notification);
+    layout->setContentsMargins(DPIAdapter::scaledSize(12), DPIAdapter::scaledSize(10), 
+                               DPIAdapter::scaledSize(12), DPIAdapter::scaledSize(10));
+    layout->setSpacing(DPIAdapter::scaledSize(4));
+
+    QLabel* titleLabel = new QLabel(title, notification);
+    QFont titleFont = titleLabel->font();
+    titleFont.setBold(true);
+    titleFont.setPointSizeF(DPIAdapter::scaledFontSize(10));
+    titleLabel->setFont(titleFont);
+    titleLabel->setStyleSheet("color: #00D4AA;");
+    layout->addWidget(titleLabel);
+
+    QLabel* msgLabel = new QLabel(message, notification);
+    QFont msgFont = msgLabel->font();
+    msgFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
+    msgLabel->setFont(msgFont);
+    msgLabel->setStyleSheet("color: #E0E0E0;");
+    msgLabel->setWordWrap(true);
+    layout->addWidget(msgLabel);
+
+    notification->setWindowFlags(Qt::ToolTip | Qt::WindowStaysOnTopHint);
+    
+    QRect screenRect = QGuiApplication::primaryScreen()->availableGeometry();
+    int x = screenRect.width() - notification->width() - DPIAdapter::scaledSize(20);
+    int y = screenRect.height() - notification->height() - DPIAdapter::scaledSize(20);
+    notification->move(x, y);
+
+    notification->show();
+
+    QTimer::singleShot(3000, notification, &QWidget::deleteLater);
 }
