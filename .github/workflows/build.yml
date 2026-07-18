@@ -30,7 +30,7 @@ jobs:
           host: 'linux'
           target: 'desktop'
           arch: 'gcc_64'
-          modules: 'qtmultimedia qtsvg'
+          modules: 'qtmultimedia'
           cache: 'true'
 
       - name: Configure CMake
@@ -91,7 +91,7 @@ jobs:
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
-          modules: 'qtmultimedia qtsvg'
+          modules: 'qtmultimedia'
           cache: 'true'
 
       - name: Configure CMake
@@ -108,7 +108,7 @@ jobs:
       - name: Deploy Qt libraries
         run: |
           cd build/bin/Release
-          windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw --svg
+          windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
