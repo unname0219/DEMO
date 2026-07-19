@@ -1,6 +1,8 @@
 #include "ui/MainWindow.h"
 #include "ui/HeaderBar.h"
 #include "ui/MediaViewer.h"
+#include "ui/ImageViewer.h"
+#include "ui/AudioPlayer.h"
 #include "ui/PlaybackControls.h"
 #include "ui/ProgressBar.h"
 #include "ui/VolumeSlider.h"
@@ -430,7 +432,16 @@ void MainWindow::toggleFullScreen()
         m_controlBar->raise();
 
         m_isFullScreen = true;
-        m_hideControlsTimer->start();
+        if (m_mediaViewer->videoWidget()) {
+            m_mediaViewer->videoWidget()->installEventFilter(this);
+        }
+        if (m_mediaViewer->imageViewer()) {
+            m_mediaViewer->imageViewer()->installEventFilter(this);
+        }
+        if (m_mediaViewer->audioPlayer()) {
+            m_mediaViewer->audioPlayer()->installEventFilter(this);
+        }
+        showControls();
         update();
     }
 }
@@ -442,33 +453,23 @@ void MainWindow::showControls()
 
     int ctrlH = DPIAdapter::scaledSize(52);
     int progH = DPIAdapter::scaledSize(20);
-    int w = width();
     int h = height();
 
-    // 动画：进度条从底部滑入
-    QPoint progTarget(0, h - ctrlH - progH);
-    if (m_progressBar->pos().y() >= h) {
-        m_progressBar->move(0, h);
-        m_progressBar->show();
-        m_progressBar->raise();
-    }
+    m_progressBar->show();
+    m_progressBar->raise();
+    m_controlBar->show();
+    m_controlBar->raise();
+
     m_progressBarAnimation->setTargetObject(m_progressBar);
     m_progressBarAnimation->setPropertyName("pos");
     m_progressBarAnimation->setStartValue(m_progressBar->pos());
-    m_progressBarAnimation->setEndValue(progTarget);
+    m_progressBarAnimation->setEndValue(QPoint(0, h - ctrlH - progH));
     m_progressBarAnimation->start();
 
-    // 动画：控制栏从底部滑入
-    QPoint ctrlTarget(0, h - ctrlH);
-    if (m_controlBar->pos().y() >= h) {
-        m_controlBar->move(0, h);
-        m_controlBar->show();
-        m_controlBar->raise();
-    }
     m_controlBarAnimation->setTargetObject(m_controlBar);
     m_controlBarAnimation->setPropertyName("pos");
     m_controlBarAnimation->setStartValue(m_controlBar->pos());
-    m_controlBarAnimation->setEndValue(ctrlTarget);
+    m_controlBarAnimation->setEndValue(QPoint(0, h - ctrlH));
     m_controlBarAnimation->start();
 
     QTimer::singleShot(350, this, [this]() {

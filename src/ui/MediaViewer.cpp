@@ -5,6 +5,7 @@
 #include "core/PlayerController.h"
 #include "managers/DPIAdapter.h"
 #include <QLabel>
+#include <QVideoWidget>
 #include <QVBoxLayout>
 
 MediaViewer::MediaViewer(QWidget* parent)
@@ -99,6 +100,24 @@ void MediaViewer::setVideoScalingMode(Qt::AspectRatioMode mode)
     if (m_videoPlayer) {
         m_videoPlayer->setVideoScalingMode(mode);
     }
+}
+
+QWidget* MediaViewer::videoWidget() const
+{
+    if (m_videoPlayer && m_videoPlayer->videoWidget()) {
+        return m_videoPlayer->videoWidget();
+    }
+    return nullptr;
+}
+
+ImageViewer* MediaViewer::imageViewer() const
+{
+    return m_imageViewer;
+}
+
+AudioPlayer* MediaViewer::audioPlayer() const
+{
+    return m_audioPlayer;
 }
 
 void MediaViewer::clear()

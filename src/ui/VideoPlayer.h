@@ -17,6 +17,7 @@ public:
 
     void setMediaPlayer(PlayerController* controller);
     void setVideoScalingMode(Qt::AspectRatioMode mode);
+    QVideoWidget* videoWidget() const { return m_videoWidget; }
 
 private:
     void setupUI();

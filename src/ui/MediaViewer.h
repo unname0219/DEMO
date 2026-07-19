@@ -25,6 +25,9 @@ public:
     MediaType currentMediaType() const;
     void setSmoothScaling(bool smooth);
     void setVideoScalingMode(Qt::AspectRatioMode mode);
+    QWidget* videoWidget() const;
+    ImageViewer* imageViewer() const;
+    AudioPlayer* audioPlayer() const;
 
 private:
     void setupUI();
