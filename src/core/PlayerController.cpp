@@ -16,7 +16,6 @@ PlayerController::PlayerController(QObject* parent)
 
     QSettings settings;
     m_pitchCompensation = settings.value("playback/preservePitch", true).toBool();
-    applyPitchCompensation();
 
     connect(m_mediaPlayer, &QMediaPlayer::playbackStateChanged,
             this, &PlayerController::onMediaPlayerStateChanged);
@@ -169,20 +168,12 @@ void PlayerController::setPitchCompensation(bool enabled)
     m_pitchCompensation = enabled;
     QSettings settings;
     settings.setValue("playback/preservePitch", enabled);
-    applyPitchCompensation();
     emit pitchCompensationChanged(enabled);
 }
 
 bool PlayerController::pitchCompensation() const
 {
     return m_pitchCompensation;
-}
-
-void PlayerController::applyPitchCompensation()
-{
-#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
-    m_mediaPlayer->setPitchCompensation(m_pitchCompensation);
-#endif
 }
 
 void PlayerController::onMediaPlayerStateChanged(QMediaPlayer::PlaybackState state)
