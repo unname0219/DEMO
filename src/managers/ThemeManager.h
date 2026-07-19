@@ -26,6 +26,7 @@ public:
 
     QString primaryColor() const;
     QString backgroundColor() const;
+    QString headerBackgroundColor() const;
     QString textColor() const;
     QString secondaryTextColor() const;
     QString borderColor() const;

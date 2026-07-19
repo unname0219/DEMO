@@ -128,6 +128,11 @@ QString ThemeManager::backgroundColor() const
     return isDarkMode() ? "#2D2D2D" : "#FAF7F0";
 }
 
+QString ThemeManager::headerBackgroundColor() const
+{
+    return isDarkMode() ? "#1F1F1F" : "#FFFDF8";
+}
+
 QString ThemeManager::textColor() const
 {
     return isDarkMode() ? "#E0E0E0" : "#333333";
