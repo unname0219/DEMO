@@ -45,6 +45,8 @@ public slots:
     void seekForward(int seconds);
     void seekBackward(int seconds);
     void setVolumeBoostEnabled(bool enabled);
+    void setPitchCompensation(bool enabled);
+    bool pitchCompensation() const;
 
 signals:
     void playbackStateChanged(PlaybackState state);
@@ -56,6 +58,7 @@ signals:
     void mediaLoaded(const QString& filePath);
     void errorOccurred(const QString& error);
     void volumeBoostRequested();
+    void pitchCompensationChanged(bool enabled);
 
 private slots:
     void onMediaPlayerStateChanged(QMediaPlayer::PlaybackState state);
@@ -63,12 +66,15 @@ private slots:
     void onVolumeBoostCheck(int value);
 
 private:
+    void applyPitchCompensation();
+
     QMediaPlayer* m_mediaPlayer;
     QAudioOutput* m_audioOutput;
     PlaybackState m_playbackState;
     double m_playbackSpeed;
     bool m_volumeBoostEnabled;
     int m_volumeBeforeBoost;
+    bool m_pitchCompensation;
 };
 
 #endif

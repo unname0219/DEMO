@@ -3,7 +3,7 @@
 
 #include <QWidget>
 #include <QLabel>
-#include <QSlider>
+#include "ui/SeekSlider.h"
 
 class ProgressBar : public QWidget
 {
@@ -23,7 +23,6 @@ public slots:
 private slots:
     void onSliderMoved(int value);
     void onSliderReleased();
-    void onValueChanged(int value);
 
 private:
     void setupUI();
@@ -31,7 +30,7 @@ private:
 
     QLabel* m_timeLabel;
     QLabel* m_durationLabel;
-    QSlider* m_slider;
+    SeekSlider* m_slider;
 
     qint64 m_position;
     qint64 m_duration;

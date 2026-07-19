@@ -117,9 +117,11 @@ void MainWindow::setupUI()
     controlLayout->setSpacing(0);
 
     QWidget* leftPanel = new QWidget(m_controlBar);
+    leftPanel->setFixedWidth(DPIAdapter::scaledSize(260));
     QHBoxLayout* leftLayout = new QHBoxLayout(leftPanel);
     leftLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, 0, 0);
     leftLayout->setSpacing(DPIAdapter::scaledSize(8));
+    leftLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     QPushButton* settingsBtn = new QPushButton(leftPanel);
     settingsBtn->setFixedSize(DPIAdapter::scaledSize(34), DPIAdapter::scaledSize(34));
@@ -143,9 +145,11 @@ void MainWindow::setupUI()
     controlLayout->addStretch(1);
 
     QWidget* rightPanel = new QWidget(m_controlBar);
+    rightPanel->setFixedWidth(DPIAdapter::scaledSize(260));
     QHBoxLayout* rightLayout = new QHBoxLayout(rightPanel);
     rightLayout->setContentsMargins(0, 0, DPIAdapter::scaledSize(12), 0);
     rightLayout->setSpacing(DPIAdapter::scaledSize(8));
+    rightLayout->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     m_speedSelector = new SpeedSelector(rightPanel);
     rightLayout->addWidget(m_speedSelector);
@@ -237,6 +241,10 @@ void MainWindow::setupConnections()
     // 视频缩放模式立即生效
     connect(m_settingsPanel, &SettingsPanel::videoScalingModeChanged,
             m_mediaViewer, &MediaViewer::setVideoScalingMode);
+
+    // 倍速模式（音调补偿）
+    connect(m_settingsPanel, &SettingsPanel::playbackSpeedModeChanged,
+            m_playerController, &PlayerController::setPitchCompensation);
 
     connect(ThemeManager::instance(), &ThemeManager::themeChanged,
             this, [this]() { update(); });
@@ -406,18 +414,18 @@ void MainWindow::toggleFullScreen()
         // 进度条浮在上面
         m_progressBar->setParent(centralWidget());
         m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
-        m_progressBar->setStyleSheet("QWidget { background-color: rgba(0,0,0,0.5); }");
         m_progressBar->raise();
         m_progressBar->show();
 
         // 控制栏浮在上面
         m_controlBar->setParent(centralWidget());
         m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
-        m_controlBar->setStyleSheet(
-            "QWidget#controlBar { background-color: rgba(0,0,0,0.5); }"
-            "QPushButton { background-color: transparent; }"
-        );
         m_controlBar->setObjectName("controlBar");
+        m_controlBar->setStyleSheet(
+            "#controlBar { background-color: rgba(0,0,0,180); }"
+            "#controlBar QPushButton { background-color: transparent; }"
+            "#controlBar QLabel { color: white; }"
+        );
         m_controlBar->raise();
         m_controlBar->show();
 
@@ -462,6 +470,13 @@ void MainWindow::showControls()
     m_controlBarAnimation->setStartValue(m_controlBar->pos());
     m_controlBarAnimation->setEndValue(ctrlTarget);
     m_controlBarAnimation->start();
+
+    QTimer::singleShot(350, this, [this]() {
+        if (m_isFullScreen) {
+            m_progressBar->raise();
+            m_controlBar->raise();
+        }
+    });
 
     m_hideControlsTimer->start();
 }
@@ -620,7 +635,7 @@ void MainWindow::paintEvent(QPaintEvent* event)
         painter.setPen(Qt::NoPen);
         painter.drawRect(rect());
     } else {
-        QColor borderColor = ThemeManager::instance()->primaryColor();
+        QColor borderColor = ThemeManager::instance()->borderColor();
         QPen borderPen(borderColor);
         borderPen.setWidth(1);
         painter.setPen(borderPen);

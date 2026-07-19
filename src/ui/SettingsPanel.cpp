@@ -44,7 +44,7 @@ void SettingsPanel::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     QColor bg = ThemeManager::instance()->backgroundColor();
     painter.setBrush(QBrush(bg));
-    QPen borderPen(QColor(0, 200, 100));
+    QPen borderPen(ThemeManager::instance()->borderColor());
     borderPen.setWidth(1);
     painter.setPen(borderPen);
     painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 
@@ -106,20 +106,6 @@ void SettingsPanel::setupUI()
     m_navList->setFrameShape(QFrame::NoFrame);
     m_navList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_navList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_navList->setStyleSheet(QString(
-        "QListWidget { background: transparent; border: none; padding: %1px 0; }"
-        "QListWidget::item { height: %2px; padding-left: %3px; color: %4; "
-        "border-left: 2px solid transparent; }"
-        "QListWidget::item:selected { background: rgba(0,212,170,15); color: %5; "
-        "border-left: 2px solid %5; }"
-        "QListWidget::item:hover { background: rgba(0,212,170,8); }"
-    ).arg(
-        QString::number(DPIAdapter::scaledSize(8)),
-        QString::number(DPIAdapter::scaledSize(36)),
-        QString::number(DPIAdapter::scaledSize(12)),
-        ThemeManager::instance()->textColor(),
-        ThemeManager::instance()->primaryColor()
-    ));
 
     QStringList navItems;
     navItems << "外观" << "文件关联" << "格式支持包" << "播放设置" << "快捷键" << "关于";
@@ -167,6 +153,29 @@ void SettingsPanel::setupUI()
     m_contentStack->addWidget(aboutPage);
 
     connect(m_navList, &QListWidget::currentRowChanged, m_contentStack, &QStackedWidget::setCurrentIndex);
+
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, &SettingsPanel::updateNavListStyle);
+    updateNavListStyle();
+}
+
+void SettingsPanel::updateNavListStyle()
+{
+    if (!m_navList) return;
+    m_navList->setStyleSheet(QString(
+        "QListWidget { background: transparent; border: none; padding: %1px 0; }"
+        "QListWidget::item { height: %2px; padding-left: %3px; color: %4; "
+        "border-left: 2px solid transparent; }"
+        "QListWidget::item:selected { background: rgba(0,212,170,15); color: %5; "
+        "border-left: 2px solid %5; }"
+        "QListWidget::item:hover { background: rgba(0,212,170,8); }"
+    ).arg(
+        QString::number(DPIAdapter::scaledSize(8)),
+        QString::number(DPIAdapter::scaledSize(36)),
+        QString::number(DPIAdapter::scaledSize(12)),
+        ThemeManager::instance()->textColor(),
+        ThemeManager::instance()->primaryColor()
+    ));
+    update();
 }
 
 void SettingsPanel::setupAppearancePage(QWidget* page)

@@ -1,4 +1,5 @@
 #include "core/PlayerController.h"
+#include <QSettings>
 
 PlayerController::PlayerController(QObject* parent)
     : QObject(parent)
@@ -8,9 +9,14 @@ PlayerController::PlayerController(QObject* parent)
     , m_playbackSpeed(1.0)
     , m_volumeBoostEnabled(false)
     , m_volumeBeforeBoost(100)
+    , m_pitchCompensation(true)
 {
     m_mediaPlayer->setAudioOutput(m_audioOutput);
     m_audioOutput->setVolume(0.7);
+
+    QSettings settings;
+    m_pitchCompensation = settings.value("playback/preservePitch", true).toBool();
+    applyPitchCompensation();
 
     connect(m_mediaPlayer, &QMediaPlayer::playbackStateChanged,
             this, &PlayerController::onMediaPlayerStateChanged);
@@ -155,6 +161,28 @@ void PlayerController::setVolumeBoostEnabled(bool enabled)
             setVolume(100);
         }
     }
+}
+
+void PlayerController::setPitchCompensation(bool enabled)
+{
+    if (m_pitchCompensation == enabled) return;
+    m_pitchCompensation = enabled;
+    QSettings settings;
+    settings.setValue("playback/preservePitch", enabled);
+    applyPitchCompensation();
+    emit pitchCompensationChanged(enabled);
+}
+
+bool PlayerController::pitchCompensation() const
+{
+    return m_pitchCompensation;
+}
+
+void PlayerController::applyPitchCompensation()
+{
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    m_mediaPlayer->setPitchCompensation(m_pitchCompensation);
+#endif
 }
 
 void PlayerController::onMediaPlayerStateChanged(QMediaPlayer::PlaybackState state)

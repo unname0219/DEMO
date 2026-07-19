@@ -125,7 +125,7 @@ QString ThemeManager::primaryColor() const
 
 QString ThemeManager::backgroundColor() const
 {
-    return isDarkMode() ? "#2D2D2D" : "#FAF8F5";
+    return isDarkMode() ? "#2D2D2D" : "#FAF7F0";
 }
 
 QString ThemeManager::textColor() const
@@ -168,13 +168,13 @@ void ThemeManager::applyTheme()
 void ThemeManager::loadStyleSheet()
 {
     bool dark = isDarkMode();
-    QString bg = dark ? "#2D2D2D" : "#FAF8F5";
+    QString bg = dark ? "#2D2D2D" : "#FAF7F0";
     QString text = dark ? "#E0E0E0" : "#333333";
     QString secondary = dark ? "#888888" : "#666666";
-    QString border = dark ? "#444444" : "#E0E0E0";
-    QString hover = dark ? "#3A3A3A" : "#F0EDE8";
-    QString headerBg = dark ? "#1F1F1F" : "#FFFFFF";
-    QString controlBg = dark ? "#252525" : "#FFFFFF";
+    QString border = dark ? "#444444" : "#E8E3D8";
+    QString hover = dark ? "#3A3A3A" : "#F0ECE2";
+    QString headerBg = dark ? "#1F1F1F" : "#FFFDF8";
+    QString controlBg = dark ? "#252525" : "#FFFDF8";
     QString primary = "#00D4AA";
     QString progressStart = "#00D4AA";
     QString progressEnd = "#00FFC8";

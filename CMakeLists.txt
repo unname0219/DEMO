@@ -31,6 +31,7 @@ set(SOURCES
     src/ui/AudioPlayer.cpp
     src/ui/PlaybackControls.cpp
     src/ui/ProgressBar.cpp
+    src/ui/SeekSlider.cpp
     src/ui/VolumeSlider.cpp
     src/ui/SpeedSelector.cpp
     src/ui/SettingsPanel.cpp
@@ -54,6 +55,7 @@ set(HEADERS
     src/ui/AudioPlayer.h
     src/ui/PlaybackControls.h
     src/ui/ProgressBar.h
+    src/ui/SeekSlider.h
     src/ui/VolumeSlider.h
     src/ui/SpeedSelector.h
     src/ui/SettingsPanel.h

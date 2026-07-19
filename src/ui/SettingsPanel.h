@@ -39,6 +39,7 @@ private:
     void setupShortcutsPage(QWidget* page);
     void setupAboutPage(QWidget* page);
     void refreshFileAssocPage();
+    void updateNavListStyle();
 
     QTabWidget* m_tabWidget;
     QListWidget* m_navList;

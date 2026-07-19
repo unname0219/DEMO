@@ -1,4 +1,5 @@
 #include "ui/ProgressBar.h"
+#include "ui/SeekSlider.h"
 #include "managers/DPIAdapter.h"
 #include "utils/FormatUtils.h"
 #include <QHBoxLayout>
@@ -35,12 +36,14 @@ void ProgressBar::setupUI()
     m_timeLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(m_timeLabel);
 
-    m_slider = new QSlider(Qt::Horizontal, this);
-    m_slider->setRange(0, 100);
-    m_slider->setTracking(false);
-    connect(m_slider, &QSlider::sliderMoved, this, &ProgressBar::onSliderMoved);
-    connect(m_slider, &QSlider::sliderReleased, this, &ProgressBar::onSliderReleased);
-    connect(m_slider, &QSlider::valueChanged, this, &ProgressBar::onValueChanged);
+    m_slider = new SeekSlider(Qt::Horizontal, this);
+    m_slider->setRange(0, 1000);
+    m_slider->setTracking(true);
+    connect(m_slider, &SeekSlider::sliderPressed, this, [this]() {
+        m_isSeeking = true;
+    });
+    connect(m_slider, &SeekSlider::sliderMoved, this, &ProgressBar::onSliderMoved);
+    connect(m_slider, &SeekSlider::sliderReleased, this, &ProgressBar::onSliderReleased);
     layout->addWidget(m_slider, 1);
 
     m_durationLabel = new QLabel("00:00", this);
@@ -48,18 +51,6 @@ void ProgressBar::setupUI()
     m_durationLabel->setFixedWidth(DPIAdapter::scaledSize(56));
     m_durationLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(m_durationLabel);
-}
-
-void ProgressBar::onValueChanged(int value)
-{
-    if (!m_isSeeking) {
-        return;
-    }
-    if (m_duration > 0) {
-        qint64 newPos = (value * m_duration) / 1000;
-        m_timeLabel->setText(FormatUtils::formatTime(newPos));
-        emit seekRequested(newPos);
-    }
 }
 
 void ProgressBar::onPositionChanged(qint64 position)
@@ -84,7 +75,6 @@ void ProgressBar::onDurationChanged(qint64 duration)
 
 void ProgressBar::onSliderMoved(int value)
 {
-    m_isSeeking = true;
     if (m_duration > 0) {
         qint64 newPos = (value * m_duration) / 1000;
         m_timeLabel->setText(FormatUtils::formatTime(newPos));
