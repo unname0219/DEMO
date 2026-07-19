@@ -8,6 +8,7 @@
 
 class VideoPlayer;
 class ImageViewer;
+class AudioPlayer;
 class QLabel;
 
 class MediaViewer : public QWidget
@@ -31,6 +32,7 @@ private:
     QStackedLayout* m_stackedLayout;
     VideoPlayer* m_videoPlayer;
     ImageViewer* m_imageViewer;
+    AudioPlayer* m_audioPlayer;
     QLabel* m_placeholderLabel;
     MediaType m_currentType;
 };

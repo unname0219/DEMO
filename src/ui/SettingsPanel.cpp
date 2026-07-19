@@ -5,6 +5,7 @@
 #include "managers/DPIAdapter.h"
 #include "managers/IconManager.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QRadioButton>
 #include <QCheckBox>
@@ -16,17 +17,21 @@
 #include <QFrame>
 #include <QPainter>
 #include <QMouseEvent>
+#include <QListWidget>
+#include <QStackedWidget>
 
 SettingsPanel::SettingsPanel(QWidget* parent)
     : QDialog(parent)
     , m_tabWidget(nullptr)
+    , m_navList(nullptr)
+    , m_contentStack(nullptr)
     , m_titleBar(nullptr)
     , m_isDragging(false)
 {
     setWindowTitle("Firefly Player - 设置");
     setModal(true);
-    setMinimumSize(DPIAdapter::scaledSize(600), DPIAdapter::scaledSize(480));
-    resize(DPIAdapter::scaledSize(600), DPIAdapter::scaledSize(520));
+    setMinimumSize(DPIAdapter::scaledSize(620), DPIAdapter::scaledSize(480));
+    resize(DPIAdapter::scaledSize(620), DPIAdapter::scaledSize(520));
     setAttribute(Qt::WA_TranslucentBackground, true);
     setWindowFlags(windowFlags() | Qt::FramelessWindowHint);
     setupUI();
@@ -89,53 +94,79 @@ void SettingsPanel::setupUI()
 
     mainLayout->addWidget(m_titleBar);
 
-    m_tabWidget = new QTabWidget(this);
-    m_tabWidget->setTabPosition(QTabWidget::West);
-    m_tabWidget->setDocumentMode(true);
-    QString tabStyle = QString(
-        "QTabWidget::pane { border: 1px solid %3; border-left: none; background: transparent; border-radius: 0 6px 6px 0; }"
-        "QTabWidget::tab-bar { width: %4px; }"
-        "QTabBar::tab { height: %5px; width: %4px; "
-        "background: transparent; color: %1; padding: 0 %6px; margin-bottom: 2px; "
-        "border: 1px solid transparent; border-right: none; border-radius: %7px 0 0 %7px; }"
-        "QTabBar::tab:selected { background: rgba(0,212,170,20); color: %2; "
-        "border: 1px solid %3; border-right: none; }"
-        "QTabBar::tab:hover { background: rgba(0,212,170,10); }"
+    // 左侧导航 + 右侧内容区
+    QHBoxLayout* contentLayout = new QHBoxLayout();
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(0);
+
+    // 左侧导航列表
+    m_navList = new QListWidget(this);
+    m_navList->setFixedWidth(DPIAdapter::scaledSize(110));
+    m_navList->setSpacing(2);
+    m_navList->setFrameShape(QFrame::NoFrame);
+    m_navList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_navList->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_navList->setStyleSheet(QString(
+        "QListWidget { background: transparent; border: none; padding: %1px 0; }"
+        "QListWidget::item { height: %2px; padding-left: %3px; color: %4; "
+        "border-left: 2px solid transparent; }"
+        "QListWidget::item:selected { background: rgba(0,212,170,15); color: %5; "
+        "border-left: 2px solid %5; }"
+        "QListWidget::item:hover { background: rgba(0,212,170,8); }"
     ).arg(
-        ThemeManager::instance()->textColor(),
-        ThemeManager::instance()->primaryColor(),
-        ThemeManager::instance()->borderColor(),
-        QString::number(DPIAdapter::scaledSize(80)),
-        QString::number(DPIAdapter::scaledSize(40)),
         QString::number(DPIAdapter::scaledSize(8)),
-        QString::number(DPIAdapter::scaledSize(4))
-    );
-    m_tabWidget->setStyleSheet(tabStyle);
-    mainLayout->addWidget(m_tabWidget);
+        QString::number(DPIAdapter::scaledSize(36)),
+        QString::number(DPIAdapter::scaledSize(12)),
+        ThemeManager::instance()->textColor(),
+        ThemeManager::instance()->primaryColor()
+    ));
+
+    QStringList navItems;
+    navItems << "外观" << "文件关联" << "格式支持包" << "播放设置" << "快捷键" << "关于";
+    foreach (const QString& item, navItems) {
+        m_navList->addItem(item);
+    }
+    m_navList->setCurrentRow(0);
+
+    contentLayout->addWidget(m_navList);
+
+    // 分隔线
+    QFrame* vLine = new QFrame(this);
+    vLine->setFrameShape(QFrame::VLine);
+    vLine->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->borderColor()));
+    contentLayout->addWidget(vLine);
+
+    // 右侧内容区
+    m_contentStack = new QStackedWidget(this);
+    contentLayout->addWidget(m_contentStack, 1);
+
+    mainLayout->addLayout(contentLayout, 1);
 
     QWidget* appearancePage = new QWidget();
     setupAppearancePage(appearancePage);
-    m_tabWidget->addTab(appearancePage, "外观");
+    m_contentStack->addWidget(appearancePage);
 
     QWidget* fileAssocPage = new QWidget();
     setupFileAssocPage(fileAssocPage);
-    m_tabWidget->addTab(fileAssocPage, "文件关联");
+    m_contentStack->addWidget(fileAssocPage);
 
     QWidget* pluginsPage = new QWidget();
     setupPluginsPage(pluginsPage);
-    m_tabWidget->addTab(pluginsPage, "格式支持包");
+    m_contentStack->addWidget(pluginsPage);
 
     QWidget* playbackPage = new QWidget();
     setupPlaybackPage(playbackPage);
-    m_tabWidget->addTab(playbackPage, "播放设置");
+    m_contentStack->addWidget(playbackPage);
 
     QWidget* shortcutsPage = new QWidget();
     setupShortcutsPage(shortcutsPage);
-    m_tabWidget->addTab(shortcutsPage, "快捷键");
+    m_contentStack->addWidget(shortcutsPage);
 
     QWidget* aboutPage = new QWidget();
     setupAboutPage(aboutPage);
-    m_tabWidget->addTab(aboutPage, "关于");
+    m_contentStack->addWidget(aboutPage);
+
+    connect(m_navList, &QListWidget::currentRowChanged, m_contentStack, &QStackedWidget::setCurrentIndex);
 }
 
 void SettingsPanel::setupAppearancePage(QWidget* page)
@@ -237,7 +268,9 @@ void SettingsPanel::setupFileAssocPage(QWidget* page)
     foreach (const QString& fmt, videoFormats) {
         QCheckBox* cb = new QCheckBox(fmt.toUpper() + " (*." + fmt + ")", videoGroup);
         cb->setChecked(fa->videoFormats().contains(fmt));
+        cb->setProperty("format", fmt);
         videoLayout->addWidget(cb);
+        m_videoCheckboxes.append(cb);
     }
     scrollLayout->addWidget(videoGroup);
 
@@ -248,7 +281,9 @@ void SettingsPanel::setupFileAssocPage(QWidget* page)
     foreach (const QString& fmt, audioFormats) {
         QCheckBox* cb = new QCheckBox(fmt.toUpper() + " (*." + fmt + ")", audioGroup);
         cb->setChecked(fa->audioFormats().contains(fmt));
+        cb->setProperty("format", fmt);
         audioLayout->addWidget(cb);
+        m_audioCheckboxes.append(cb);
     }
     scrollLayout->addWidget(audioGroup);
 
@@ -259,7 +294,9 @@ void SettingsPanel::setupFileAssocPage(QWidget* page)
     foreach (const QString& fmt, imageFormats) {
         QCheckBox* cb = new QCheckBox(fmt.toUpper() + " (*." + fmt + ")", imageGroup);
         cb->setChecked(fa->imageFormats().contains(fmt));
+        cb->setProperty("format", fmt);
         imageLayout->addWidget(cb);
+        m_imageCheckboxes.append(cb);
     }
     scrollLayout->addWidget(imageGroup);
 
@@ -389,6 +426,37 @@ void SettingsPanel::setupPlaybackPage(QWidget* page)
     speedLayout->addWidget(speedCombo);
     layout->addWidget(speedGroup);
 
+    QGroupBox* speedModeGroup = new QGroupBox("倍速模式", page);
+    QVBoxLayout* speedModeLayout = new QVBoxLayout(speedModeGroup);
+    speedModeLayout->setSpacing(DPIAdapter::scaledSize(8));
+
+    QSettings settings2;
+    bool preservePitch = settings2.value("playback/preservePitch", true).toBool();
+
+    QRadioButton* pitchBtn = new QRadioButton("不变调（推荐）", speedModeGroup);
+    pitchBtn->setChecked(preservePitch);
+    connect(pitchBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("playback/preservePitch", true);
+            emit playbackSpeedModeChanged(true);
+        }
+    });
+    speedModeLayout->addWidget(pitchBtn);
+
+    QRadioButton* normalBtn = new QRadioButton("普通倍速（音调随速度变化）", speedModeGroup);
+    normalBtn->setChecked(!preservePitch);
+    connect(normalBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("playback/preservePitch", false);
+            emit playbackSpeedModeChanged(false);
+        }
+    });
+    speedModeLayout->addWidget(normalBtn);
+
+    layout->addWidget(speedModeGroup);
+
     QGroupBox* volGroup = new QGroupBox("音量增强", page);
     QVBoxLayout* volLayout = new QVBoxLayout(volGroup);
     volLayout->setSpacing(DPIAdapter::scaledSize(8));
@@ -506,6 +574,31 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     authorLabel->setAlignment(Qt::AlignCenter);
     authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
     layout->addWidget(authorLabel);
+}
+
+void SettingsPanel::showEvent(QShowEvent* event)
+{
+    QDialog::showEvent(event);
+    refreshFileAssocPage();
+}
+
+void SettingsPanel::refreshFileAssocPage()
+{
+    FileAssociation* fa = FileAssociation::instance();
+    fa->syncFromSystem();
+
+    foreach (QCheckBox* cb, m_videoCheckboxes) {
+        QString fmt = cb->property("format").toString();
+        cb->setChecked(fa->videoFormats().contains(fmt));
+    }
+    foreach (QCheckBox* cb, m_audioCheckboxes) {
+        QString fmt = cb->property("format").toString();
+        cb->setChecked(fa->audioFormats().contains(fmt));
+    }
+    foreach (QCheckBox* cb, m_imageCheckboxes) {
+        QString fmt = cb->property("format").toString();
+        cb->setChecked(fa->imageFormats().contains(fmt));
+    }
 }
 
 void SettingsPanel::mousePressEvent(QMouseEvent* event)

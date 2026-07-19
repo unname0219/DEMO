@@ -155,6 +155,54 @@ bool FileAssociation::isAssociated(const QString& extension) const
         || m_imageFormats.contains(ext);
 }
 
+void FileAssociation::syncFromSystem()
+{
+    QString progId = "FireflyPlayer";
+
+    static const QStringList knownVideo = {"mp4", "mkv", "avi", "mov", "webm", "flv", "wmv", "m4v", "ts", "3gp"};
+    static const QStringList knownAudio = {"mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "ape", "opus"};
+    static const QStringList knownImage = {"jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "ico"};
+
+    QStringList newVideo;
+    QStringList newAudio;
+    QStringList newImage;
+
+    foreach (const QString& ext, knownVideo) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        QString currentProgId = extSettings.value(".Default").toString();
+        if (currentProgId == progId) {
+            newVideo.append(ext);
+        }
+    }
+
+    foreach (const QString& ext, knownAudio) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        QString currentProgId = extSettings.value(".Default").toString();
+        if (currentProgId == progId) {
+            newAudio.append(ext);
+        }
+    }
+
+    foreach (const QString& ext, knownImage) {
+        QString extKey = QString(".%1").arg(ext);
+        QSettings extSettings(QString("HKEY_CURRENT_USER\\Software\\Classes\\%1").arg(extKey),
+                              QSettings::NativeFormat);
+        QString currentProgId = extSettings.value(".Default").toString();
+        if (currentProgId == progId) {
+            newImage.append(ext);
+        }
+    }
+
+    m_videoFormats = newVideo;
+    m_audioFormats = newAudio;
+    m_imageFormats = newImage;
+    saveToSettings();
+}
+
 void FileAssociation::loadFromSettings()
 {
     QSettings settings;

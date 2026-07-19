@@ -27,6 +27,8 @@ public:
 
     bool isAssociated(const QString& extension) const;
 
+    void syncFromSystem();
+
 private:
     FileAssociation();
     ~FileAssociation();

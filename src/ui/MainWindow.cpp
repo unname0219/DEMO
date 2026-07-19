@@ -370,11 +370,15 @@ void MainWindow::toggleFullScreen()
         // 恢复控件到布局中
         QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
         if (mainLayout) {
+            mainLayout->removeWidget(m_mediaViewer);
+            m_mediaViewer->setParent(centralWidget());
+            mainLayout->insertWidget(1, m_mediaViewer, 1);
             mainLayout->insertWidget(2, m_progressBar);
             mainLayout->insertWidget(3, m_controlBar);
         }
 
         m_isFullScreen = false;
+        update();
     } else {
         setContentsMargins(0, 0, 0, 0);
         showFullScreen();
@@ -383,21 +387,30 @@ void MainWindow::toggleFullScreen()
         // 从布局中移除控件，改为绝对定位浮动
         QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
         if (mainLayout) {
+            mainLayout->removeWidget(m_mediaViewer);
             mainLayout->removeWidget(m_progressBar);
             mainLayout->removeWidget(m_controlBar);
         }
 
-        int ctrlH = DPIAdapter::scaledSize(52);
-        int progH = DPIAdapter::scaledSize(20);
         int w = width();
         int h = height();
+        int ctrlH = DPIAdapter::scaledSize(52);
+        int progH = DPIAdapter::scaledSize(20);
 
+        // 视频放最底层，充满整个窗口
+        m_mediaViewer->setParent(centralWidget());
+        m_mediaViewer->setGeometry(0, 0, w, h);
+        m_mediaViewer->lower();
+        m_mediaViewer->show();
+
+        // 进度条浮在上面
         m_progressBar->setParent(centralWidget());
         m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
         m_progressBar->setStyleSheet("QWidget { background-color: rgba(0,0,0,0.5); }");
-        m_progressBar->show();
         m_progressBar->raise();
+        m_progressBar->show();
 
+        // 控制栏浮在上面
         m_controlBar->setParent(centralWidget());
         m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
         m_controlBar->setStyleSheet(
@@ -405,11 +418,12 @@ void MainWindow::toggleFullScreen()
             "QPushButton { background-color: transparent; }"
         );
         m_controlBar->setObjectName("controlBar");
-        m_controlBar->show();
         m_controlBar->raise();
+        m_controlBar->show();
 
         m_isFullScreen = true;
         m_hideControlsTimer->start();
+        update();
     }
 }
 
@@ -578,11 +592,12 @@ void MainWindow::resizeEvent(QResizeEvent* event)
                               (height() - m_settingsPanel->height()) / 2);
     }
     // 全屏下更新浮动控件位置
-    if (m_isFullScreen && m_progressBar && m_controlBar) {
-        int ctrlH = m_controlBar->height();
-        int progH = m_progressBar->height();
+    if (m_isFullScreen && m_progressBar && m_controlBar && m_mediaViewer) {
         int w = width();
         int h = height();
+        int ctrlH = m_controlBar->height();
+        int progH = m_progressBar->height();
+        m_mediaViewer->setGeometry(0, 0, w, h);
         m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
         m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
     }
@@ -600,8 +615,17 @@ void MainWindow::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     QColor bg = ThemeManager::instance()->backgroundColor();
     painter.setBrush(QBrush(bg));
-    painter.setPen(Qt::NoPen);
-    painter.drawRoundedRect(rect(), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+
+    if (m_isFullScreen) {
+        painter.setPen(Qt::NoPen);
+        painter.drawRect(rect());
+    } else {
+        QColor borderColor = ThemeManager::instance()->primaryColor();
+        QPen borderPen(borderColor);
+        borderPen.setWidth(1);
+        painter.setPen(borderPen);
+        painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+    }
 }
 
 void MainWindow::changeEvent(QEvent* event)
@@ -753,11 +777,10 @@ void MainWindow::checkFileAssociations()
 {
     FileAssociation* fa = FileAssociation::instance();
     QStringList allFormats = fa->videoFormats() + fa->audioFormats() + fa->imageFormats();
-    
-    if (allFormats.isEmpty()) return;
 
     if (!fa->checkAssociationMatches()) {
-        showNotification("文件关联", "检测到配置文件与实际文件关联不一致");
+        fa->syncFromSystem();
+        showNotification("文件关联", "检测到文件关联变化，已同步配置");
     }
 }
 

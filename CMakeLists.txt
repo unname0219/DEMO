@@ -28,6 +28,7 @@ set(SOURCES
     src/ui/MediaViewer.cpp
     src/ui/VideoPlayer.cpp
     src/ui/ImageViewer.cpp
+    src/ui/AudioPlayer.cpp
     src/ui/PlaybackControls.cpp
     src/ui/ProgressBar.cpp
     src/ui/VolumeSlider.cpp
@@ -50,6 +51,7 @@ set(HEADERS
     src/ui/MediaViewer.h
     src/ui/VideoPlayer.h
     src/ui/ImageViewer.h
+    src/ui/AudioPlayer.h
     src/ui/PlaybackControls.h
     src/ui/ProgressBar.h
     src/ui/VolumeSlider.h

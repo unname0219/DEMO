@@ -5,6 +5,10 @@
 #include <QTabWidget>
 #include <QMediaPlayer>
 #include <QMouseEvent>
+#include <QShowEvent>
+#include <QStackedWidget>
+#include <QListWidget>
+#include <QCheckBox>
 
 class SettingsPanel : public QDialog
 {
@@ -17,12 +21,14 @@ public:
 signals:
     void imageScalingChanged(bool smooth);
     void videoScalingModeChanged(Qt::AspectRatioMode mode);
+    void playbackSpeedModeChanged(bool preservePitch);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void showEvent(QShowEvent* event) override;
 
 private:
     void setupUI();
@@ -32,9 +38,15 @@ private:
     void setupPlaybackPage(QWidget* page);
     void setupShortcutsPage(QWidget* page);
     void setupAboutPage(QWidget* page);
+    void refreshFileAssocPage();
 
     QTabWidget* m_tabWidget;
+    QListWidget* m_navList;
+    QStackedWidget* m_contentStack;
     QWidget* m_titleBar;
+    QList<QCheckBox*> m_videoCheckboxes;
+    QList<QCheckBox*> m_audioCheckboxes;
+    QList<QCheckBox*> m_imageCheckboxes;
     bool m_isDragging;
     QPoint m_dragStartPosition;
 };

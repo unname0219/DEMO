@@ -1,6 +1,7 @@
 #include "ui/MediaViewer.h"
 #include "ui/VideoPlayer.h"
 #include "ui/ImageViewer.h"
+#include "ui/AudioPlayer.h"
 #include "core/PlayerController.h"
 #include "managers/DPIAdapter.h"
 #include <QLabel>
@@ -11,6 +12,7 @@ MediaViewer::MediaViewer(QWidget* parent)
     , m_stackedLayout(nullptr)
     , m_videoPlayer(nullptr)
     , m_imageViewer(nullptr)
+    , m_audioPlayer(nullptr)
     , m_placeholderLabel(nullptr)
     , m_currentType(MediaType::Unknown)
 {
@@ -44,6 +46,9 @@ void MediaViewer::setupUI()
     m_imageViewer = new ImageViewer(this);
     m_stackedLayout->addWidget(m_imageViewer);
 
+    m_audioPlayer = new AudioPlayer(this);
+    m_stackedLayout->addWidget(m_audioPlayer);
+
     m_stackedLayout->setCurrentWidget(m_placeholderLabel);
 }
 
@@ -52,11 +57,20 @@ void MediaViewer::showMedia(const QString& filePath, MediaType type, PlayerContr
     m_currentType = type;
     switch (type) {
     case MediaType::Video:
-    case MediaType::Audio:
         m_videoPlayer->setMediaPlayer(controller);
         controller->openFile(filePath);
         controller->play();
         m_stackedLayout->setCurrentWidget(m_videoPlayer);
+        break;
+    case MediaType::Audio:
+        m_audioPlayer->setMediaPlayer(controller);
+        connect(controller, &PlayerController::playbackStateChanged,
+                m_audioPlayer, [this](PlaybackState state) {
+                    m_audioPlayer->onPlaybackStateChanged(state == PlaybackState::Playing);
+                }, Qt::UniqueConnection);
+        controller->openFile(filePath);
+        controller->play();
+        m_stackedLayout->setCurrentWidget(m_audioPlayer);
         break;
     case MediaType::Image:
         m_imageViewer->loadImage(filePath);
