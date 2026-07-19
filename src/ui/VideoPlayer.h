@@ -5,7 +5,9 @@
 #include <QMediaPlayer>
 
 class QVideoWidget;
+class QStackedLayout;
 class PlayerController;
+class FFmpegVideoRenderer;
 
 class VideoPlayer : public QWidget
 {
@@ -19,10 +21,16 @@ public:
     void setVideoScalingMode(Qt::AspectRatioMode mode);
     QVideoWidget* videoWidget() const { return m_videoWidget; }
 
+private slots:
+    void onDecoderBackendChanged();
+
 private:
     void setupUI();
+    void updateActiveRenderer();
 
     QVideoWidget* m_videoWidget;
+    QStackedLayout* m_stackedLayout;
+    FFmpegVideoRenderer* m_ffmpegRenderer;
     PlayerController* m_controller;
     Qt::AspectRatioMode m_scalingMode;
 };

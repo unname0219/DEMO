@@ -23,6 +23,45 @@ find_package(Qt6 REQUIRED COMPONENTS
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
     pkg_check_modules(SOUNDTOUCH QUIET soundtouch)
+    pkg_check_modules(FFMPEG QUIET
+        libavcodec
+        libavformat
+        libavutil
+        libswscale
+        libswresample
+    )
+endif()
+
+# 如果 pkg-config 找不到，尝试手动查找头文件和库
+if(NOT FFMPEG_FOUND)
+    find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h)
+    find_library(AVCODEC_LIBRARY avcodec)
+    find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h)
+    find_library(AVFORMAT_LIBRARY avformat)
+    find_path(AVUTIL_INCLUDE_DIR libavutil/avutil.h)
+    find_library(AVUTIL_LIBRARY avutil)
+    find_path(SWSCALE_INCLUDE_DIR libswscale/swscale.h)
+    find_library(SWSCALE_LIBRARY swscale)
+    find_path(SWRESAMPLE_INCLUDE_DIR libswresample/swresample.h)
+    find_library(SWRESAMPLE_LIBRARY swresample)
+    
+    if(AVCODEC_INCLUDE_DIR AND AVCODEC_LIBRARY AND AVFORMAT_INCLUDE_DIR AND AVFORMAT_LIBRARY)
+        set(FFMPEG_FOUND TRUE)
+        set(FFMPEG_INCLUDE_DIRS
+            ${AVCODEC_INCLUDE_DIR}
+            ${AVFORMAT_INCLUDE_DIR}
+            ${AVUTIL_INCLUDE_DIR}
+            ${SWSCALE_INCLUDE_DIR}
+            ${SWRESAMPLE_INCLUDE_DIR}
+        )
+        set(FFMPEG_LIBRARIES
+            ${AVCODEC_LIBRARY}
+            ${AVFORMAT_LIBRARY}
+            ${AVUTIL_LIBRARY}
+            ${SWSCALE_LIBRARY}
+            ${SWRESAMPLE_LIBRARY}
+        )
+    endif()
 endif()
 
 if(NOT SOUNDTOUCH_FOUND)
@@ -81,6 +120,9 @@ set(SOURCES
     src/core/PlayerController.cpp
     src/core/PitchShifter.cpp
     src/core/ProcessingAudioOutput.cpp
+    src/ffmpeg/FFmpegDecoder.cpp
+    src/ffmpeg/FFmpegVideoRenderer.cpp
+    src/ffmpeg/FFmpegPlayer.cpp
     src/ui/MainWindow.cpp
     src/ui/HeaderBar.cpp
     src/ui/MediaViewer.cpp
@@ -107,6 +149,9 @@ set(HEADERS
     src/core/PlayerController.h
     src/core/PitchShifter.h
     src/core/ProcessingAudioOutput.h
+    src/ffmpeg/FFmpegDecoder.h
+    src/ffmpeg/FFmpegVideoRenderer.h
+    src/ffmpeg/FFmpegPlayer.h
     src/ui/MainWindow.h
     src/ui/HeaderBar.h
     src/ui/MediaViewer.h
@@ -154,6 +199,7 @@ endif()
 target_include_directories(FireflyPlayer PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${SOUNDTOUCH_INCLUDE_DIRS}
+    ${FFMPEG_INCLUDE_DIRS}
 )
 
 target_link_libraries(FireflyPlayer PRIVATE
@@ -164,7 +210,12 @@ target_link_libraries(FireflyPlayer PRIVATE
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     ${SOUNDTOUCH_LIBRARIES}
+    ${FFMPEG_LIBRARIES}
 )
+
+if(FFMPEG_FOUND)
+    target_compile_definitions(FireflyPlayer PRIVATE FFMPEG_ENABLED)
+endif()
 
 if(WIN32)
     set_target_properties(FireflyPlayer PROPERTIES

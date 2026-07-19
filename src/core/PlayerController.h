@@ -6,10 +6,20 @@
 #include <QAudioOutput>
 #include <QUrl>
 
+#ifdef FFMPEG_ENABLED
+class FFmpegPlayer;
+#endif
+
 enum class PlaybackState {
     Stopped,
     Playing,
     Paused
+};
+
+enum class DecoderBackend {
+    QtMultimedia,
+    FFmpegSoftware,
+    FFmpegHardware
 };
 
 class PlayerController : public QObject
@@ -30,6 +40,14 @@ public:
     bool isMuted() const;
     double playbackSpeed() const;
     bool volumeBoostEnabled() const;
+
+    DecoderBackend decoderBackend() const;
+    void setDecoderBackend(DecoderBackend backend);
+
+#ifdef FFMPEG_ENABLED
+    FFmpegPlayer* ffmpegPlayer() const;
+    bool useFFmpeg() const;
+#endif
 
 public slots:
     void openFile(const QString& filePath);
@@ -59,11 +77,20 @@ signals:
     void errorOccurred(const QString& error);
     void volumeBoostRequested();
     void pitchCompensationChanged(bool enabled);
+    void decoderBackendChanged(DecoderBackend backend);
 
 private slots:
     void onMediaPlayerStateChanged(QMediaPlayer::PlaybackState state);
     void onErrorOccurred(QMediaPlayer::Error error, const QString& errorString);
     void onVolumeBoostCheck(int value);
+
+#ifdef FFMPEG_ENABLED
+    void onFFmpegStateChanged(int state);
+    void onFFmpegPositionChanged(qint64 position);
+    void onFFmpegDurationChanged(qint64 duration);
+    void onFFmpegFinished();
+    void onFFmpegError(const QString& message);
+#endif
 
 private:
     QMediaPlayer* m_mediaPlayer;
@@ -73,6 +100,11 @@ private:
     bool m_volumeBoostEnabled;
     int m_volumeBeforeBoost;
     bool m_pitchCompensation;
+    DecoderBackend m_decoderBackend;
+
+#ifdef FFMPEG_ENABLED
+    FFmpegPlayer* m_ffmpegPlayer;
+#endif
 };
 
 #endif

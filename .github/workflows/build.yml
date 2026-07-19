@@ -65,6 +65,20 @@ jobs:
           modules: 'qtmultimedia'
           cache: 'true'
 
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $FFMPEG_VERSION = "7.0.2"
+          $FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.0-latest-win64-gpl-7.0.zip"
+          Write-Host "Downloading FFmpeg..."
+          Invoke-WebRequest -Uri $FFMPEG_URL -OutFile "ffmpeg.zip" -UseBasicParsing
+          Write-Host "Extracting FFmpeg..."
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "." -Force
+          $ffmpegDir = Get-ChildItem -Directory -Filter "ffmpeg-*" | Select-Object -First 1 -ExpandProperty FullName
+          echo "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "FFmpeg installed at: $ffmpegDir"
+
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -72,7 +86,8 @@ jobs:
           sudo apt-get install -y -qq libfuse2 libgl1-mesa-dev libxkbcommon-x11-0 \
             libxcb-cursor0 libxcb-xinerama0 libxcb-icccm4 libxcb-image0 \
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
-            libpulse0 libva2 libvdpau1 libsoundtouch-dev
+            libpulse0 libva2 libvdpau1 libsoundtouch-dev \
+            libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
 
       - name: Configure CMake (Linux)
         if: runner.os == 'Linux'
@@ -83,10 +98,23 @@ jobs:
 
       - name: Configure CMake (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           mkdir build
           cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          $ffmpegDir = $env:FFMPEG_DIR
+          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release `
+            -DFFMPEG_ROOT="$ffmpegDir" `
+            -DAVCODEC_INCLUDE_DIR="$ffmpegDir/include" `
+            -DAVCODEC_LIBRARY="$ffmpegDir/lib/avcodec.lib" `
+            -DAVFORMAT_INCLUDE_DIR="$ffmpegDir/include" `
+            -DAVFORMAT_LIBRARY="$ffmpegDir/lib/avformat.lib" `
+            -DAVUTIL_INCLUDE_DIR="$ffmpegDir/include" `
+            -DAVUTIL_LIBRARY="$ffmpegDir/lib/avutil.lib" `
+            -DSWSCALE_INCLUDE_DIR="$ffmpegDir/include" `
+            -DSWSCALE_LIBRARY="$ffmpegDir/lib/swscale.lib" `
+            -DSWRESAMPLE_INCLUDE_DIR="$ffmpegDir/include" `
+            -DSWRESAMPLE_LIBRARY="$ffmpegDir/lib/swresample.lib"
 
       - name: Build
         shell: bash
@@ -123,6 +151,7 @@ jobs:
         run: |
           cd build\bin\Release
           windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw --release
+          copy /Y %FFMPEG_DIR%\bin\*.dll .
           dir
 
       - name: Create archive (Windows)

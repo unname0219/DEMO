@@ -448,11 +448,58 @@ void SettingsPanel::setupPlaybackPage(QWidget* page)
                                 DPIAdapter::scaledSize(20), DPIAdapter::scaledSize(16));
     layout->setSpacing(DPIAdapter::scaledSize(16));
 
+    QSettings settings;
+
+#ifdef FFMPEG_ENABLED
+    QGroupBox* decoderGroup = new QGroupBox("视频解码器", page);
+    QVBoxLayout* decoderLayout = new QVBoxLayout(decoderGroup);
+    decoderLayout->setSpacing(DPIAdapter::scaledSize(8));
+
+    int decoderBackend = settings.value("playback/decoderBackend", 0).toInt();
+
+    QRadioButton* qtBtn = new QRadioButton("系统默认 (Qt Multimedia)", decoderGroup);
+    qtBtn->setChecked(decoderBackend == 0);
+    connect(qtBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("playback/decoderBackend", 0);
+        }
+    });
+    decoderLayout->addWidget(qtBtn);
+
+    QRadioButton* ffmpegSoftBtn = new QRadioButton("FFmpeg 软件解码（兼容性好）", decoderGroup);
+    ffmpegSoftBtn->setChecked(decoderBackend == 1);
+    connect(ffmpegSoftBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("playback/decoderBackend", 1);
+        }
+    });
+    decoderLayout->addWidget(ffmpegSoftBtn);
+
+    QRadioButton* ffmpegHwBtn = new QRadioButton("FFmpeg 硬件解码（性能优先）", decoderGroup);
+    ffmpegHwBtn->setChecked(decoderBackend == 2);
+    connect(ffmpegHwBtn, &QRadioButton::toggled, this, [this](bool checked) {
+        if (checked) {
+            QSettings s;
+            s.setValue("playback/decoderBackend", 2);
+        }
+    });
+    decoderLayout->addWidget(ffmpegHwBtn);
+
+    QLabel* decoderDesc = new QLabel("提示：切换解码器后需重新打开文件生效", decoderGroup);
+    QFont descFont = decoderDesc->font();
+    descFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
+    decoderDesc->setFont(descFont);
+    decoderLayout->addWidget(decoderDesc);
+
+    layout->addWidget(decoderGroup);
+#endif
+
     QGroupBox* videoGroup = new QGroupBox("视频缩放", page);
     QVBoxLayout* videoLayout = new QVBoxLayout(videoGroup);
     videoLayout->setSpacing(DPIAdapter::scaledSize(8));
 
-    QSettings settings;
     bool keepAspectRatio = settings.value("video/keepAspectRatio", true).toBool();
 
     QRadioButton* fitBtn = new QRadioButton("保持原宽高（完整显示）", videoGroup);

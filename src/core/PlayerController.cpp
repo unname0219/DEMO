@@ -1,6 +1,10 @@
 #include "core/PlayerController.h"
 #include <QSettings>
 
+#ifdef FFMPEG_ENABLED
+#include "ffmpeg/FFmpegPlayer.h"
+#endif
+
 PlayerController::PlayerController(QObject* parent)
     : QObject(parent)
     , m_mediaPlayer(new QMediaPlayer(this))
@@ -10,12 +14,19 @@ PlayerController::PlayerController(QObject* parent)
     , m_volumeBoostEnabled(false)
     , m_volumeBeforeBoost(100)
     , m_pitchCompensation(true)
+    , m_decoderBackend(DecoderBackend::QtMultimedia)
+#ifdef FFMPEG_ENABLED
+    , m_ffmpegPlayer(nullptr)
+#endif
 {
     m_mediaPlayer->setAudioOutput(m_audioOutput);
     m_audioOutput->setVolume(0.7);
 
     QSettings settings;
     m_pitchCompensation = settings.value("playback/preservePitch", true).toBool();
+    
+    int backend = settings.value("playback/decoderBackend", 0).toInt();
+    m_decoderBackend = static_cast<DecoderBackend>(backend);
 
     connect(m_mediaPlayer, &QMediaPlayer::playbackStateChanged,
             this, &PlayerController::onMediaPlayerStateChanged);
@@ -30,6 +41,22 @@ PlayerController::PlayerController(QObject* parent)
     });
     connect(m_mediaPlayer, &QMediaPlayer::errorOccurred,
             this, &PlayerController::onErrorOccurred);
+
+#ifdef FFMPEG_ENABLED
+    if (m_decoderBackend != DecoderBackend::QtMultimedia) {
+        m_ffmpegPlayer = new FFmpegPlayer(this);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::stateChanged,
+                this, &PlayerController::onFFmpegStateChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::positionChanged,
+                this, &PlayerController::onFFmpegPositionChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::durationChanged,
+                this, &PlayerController::onFFmpegDurationChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::finished,
+                this, &PlayerController::onFFmpegFinished);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::error,
+                this, &PlayerController::onFFmpegError);
+    }
+#endif
 }
 
 PlayerController::~PlayerController()
@@ -46,6 +73,52 @@ QAudioOutput* PlayerController::audioOutput() const
     return m_audioOutput;
 }
 
+DecoderBackend PlayerController::decoderBackend() const
+{
+    return m_decoderBackend;
+}
+
+void PlayerController::setDecoderBackend(DecoderBackend backend)
+{
+    if (m_decoderBackend == backend) return;
+
+    stop();
+    m_decoderBackend = backend;
+
+    QSettings settings;
+    settings.setValue("playback/decoderBackend", static_cast<int>(backend));
+
+#ifdef FFMPEG_ENABLED
+    if (backend != DecoderBackend::QtMultimedia && !m_ffmpegPlayer) {
+        m_ffmpegPlayer = new FFmpegPlayer(this);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::stateChanged,
+                this, &PlayerController::onFFmpegStateChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::positionChanged,
+                this, &PlayerController::onFFmpegPositionChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::durationChanged,
+                this, &PlayerController::onFFmpegDurationChanged);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::finished,
+                this, &PlayerController::onFFmpegFinished);
+        connect(m_ffmpegPlayer, &FFmpegPlayer::error,
+                this, &PlayerController::onFFmpegError);
+    }
+#endif
+
+    emit decoderBackendChanged(backend);
+}
+
+#ifdef FFMPEG_ENABLED
+FFmpegPlayer* PlayerController::ffmpegPlayer() const
+{
+    return m_ffmpegPlayer;
+}
+
+bool PlayerController::useFFmpeg() const
+{
+    return m_decoderBackend != DecoderBackend::QtMultimedia && m_ffmpegPlayer;
+}
+#endif
+
 PlaybackState PlayerController::playbackState() const
 {
     return m_playbackState;
@@ -53,21 +126,41 @@ PlaybackState PlayerController::playbackState() const
 
 qint64 PlayerController::position() const
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        return m_ffmpegPlayer->position();
+    }
+#endif
     return m_mediaPlayer->position();
 }
 
 qint64 PlayerController::duration() const
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        return m_ffmpegPlayer->duration();
+    }
+#endif
     return m_mediaPlayer->duration();
 }
 
 int PlayerController::volume() const
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        return m_ffmpegPlayer->volume();
+    }
+#endif
     return static_cast<int>(m_audioOutput->volume() * 100);
 }
 
 bool PlayerController::isMuted() const
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        return m_ffmpegPlayer->isMuted();
+    }
+#endif
     return m_audioOutput->isMuted();
 }
 
@@ -83,17 +176,44 @@ bool PlayerController::volumeBoostEnabled() const
 
 void PlayerController::openFile(const QString& filePath)
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        FFmpegPlayer::DecodeMode mode = (m_decoderBackend == DecoderBackend::FFmpegHardware)
+            ? FFmpegPlayer::HardwareDecode
+            : FFmpegPlayer::SoftwareDecode;
+        if (m_ffmpegPlayer->open(filePath, mode)) {
+            m_ffmpegPlayer->setVolume(volume());
+            m_ffmpegPlayer->setPlaybackSpeed(m_playbackSpeed);
+            emit mediaLoaded(filePath);
+            return;
+        } else {
+            qWarning("FFmpeg failed to open file, falling back to QtMultimedia");
+        }
+    }
+#endif
     m_mediaPlayer->setSource(QUrl::fromLocalFile(filePath));
     emit mediaLoaded(filePath);
 }
 
 void PlayerController::play()
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        m_ffmpegPlayer->play();
+        return;
+    }
+#endif
     m_mediaPlayer->play();
 }
 
 void PlayerController::pause()
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        m_ffmpegPlayer->pause();
+        return;
+    }
+#endif
     m_mediaPlayer->pause();
 }
 
@@ -108,11 +228,23 @@ void PlayerController::togglePlayPause()
 
 void PlayerController::stop()
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        m_ffmpegPlayer->stop();
+        return;
+    }
+#endif
     m_mediaPlayer->stop();
 }
 
 void PlayerController::setPosition(qint64 position)
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) {
+        m_ffmpegPlayer->setPosition(position);
+        return;
+    }
+#endif
     m_mediaPlayer->setPosition(position);
 }
 
@@ -120,34 +252,54 @@ void PlayerController::setVolume(int volume)
 {
     float vol = qBound(0, volume, m_volumeBoostEnabled ? 500 : 100) / 100.0f;
     m_audioOutput->setVolume(vol);
+
+#ifdef FFMPEG_ENABLED
+    if (m_ffmpegPlayer) {
+        m_ffmpegPlayer->setVolume(volume);
+    }
+#endif
 }
 
 void PlayerController::setMuted(bool muted)
 {
     m_audioOutput->setMuted(muted);
+
+#ifdef FFMPEG_ENABLED
+    if (m_ffmpegPlayer) {
+        m_ffmpegPlayer->setMuted(muted);
+    }
+#endif
+
     emit mutedChanged(muted);
 }
 
 void PlayerController::toggleMute()
 {
-    setMuted(!m_audioOutput->isMuted());
+    setMuted(!isMuted());
 }
 
 void PlayerController::setPlaybackSpeed(double speed)
 {
     m_playbackSpeed = speed;
     m_mediaPlayer->setPlaybackRate(speed);
+
+#ifdef FFMPEG_ENABLED
+    if (m_ffmpegPlayer) {
+        m_ffmpegPlayer->setPlaybackSpeed(speed);
+    }
+#endif
+
     emit playbackSpeedChanged(speed);
 }
 
 void PlayerController::seekForward(int seconds)
 {
-    m_mediaPlayer->setPosition(m_mediaPlayer->position() + seconds * 1000);
+    setPosition(position() + seconds * 1000);
 }
 
 void PlayerController::seekBackward(int seconds)
 {
-    m_mediaPlayer->setPosition(qMax(0LL, m_mediaPlayer->position() - seconds * 1000));
+    setPosition(qMax(0LL, position() - seconds * 1000));
 }
 
 void PlayerController::setVolumeBoostEnabled(bool enabled)
@@ -178,6 +330,10 @@ bool PlayerController::pitchCompensation() const
 
 void PlayerController::onMediaPlayerStateChanged(QMediaPlayer::PlaybackState state)
 {
+#ifdef FFMPEG_ENABLED
+    if (useFFmpeg()) return;
+#endif
+
     switch (state) {
     case QMediaPlayer::StoppedState:
         m_playbackState = PlaybackState::Stopped;
@@ -204,3 +360,47 @@ void PlayerController::onVolumeBoostCheck(int value)
         emit volumeBoostRequested();
     }
 }
+
+#ifdef FFMPEG_ENABLED
+void PlayerController::onFFmpegStateChanged(int state)
+{
+    FFmpegPlayer::PlaybackState ffmpegState = static_cast<FFmpegPlayer::PlaybackState>(state);
+    switch (ffmpegState) {
+    case FFmpegPlayer::StoppedState:
+        m_playbackState = PlaybackState::Stopped;
+        break;
+    case FFmpegPlayer::PlayingState:
+        m_playbackState = PlaybackState::Playing;
+        break;
+    case FFmpegPlayer::PausedState:
+        m_playbackState = PlaybackState::Paused;
+        break;
+    }
+    emit playbackStateChanged(m_playbackState);
+}
+
+void PlayerController::onFFmpegPositionChanged(qint64 position)
+{
+    if (useFFmpeg()) {
+        emit PlayerController::positionChanged(position);
+    }
+}
+
+void PlayerController::onFFmpegDurationChanged(qint64 duration)
+{
+    if (useFFmpeg()) {
+        emit PlayerController::durationChanged(duration);
+    }
+}
+
+void PlayerController::onFFmpegFinished()
+{
+    m_playbackState = PlaybackState::Stopped;
+    emit playbackStateChanged(m_playbackState);
+}
+
+void PlayerController::onFFmpegError(const QString& message)
+{
+    emit errorOccurred(message);
+}
+#endif
