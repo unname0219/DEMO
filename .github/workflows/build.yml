@@ -45,9 +45,9 @@ jobs:
 
       - name: Install Qt6 (Linux)
         if: runner.os == 'Linux'
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v3
         with:
-          version: '6.10.0'
+          version: '6.6.3'
           host: 'linux'
           target: 'desktop'
           arch: 'gcc_64'
@@ -56,9 +56,9 @@ jobs:
 
       - name: Install Qt6 (Windows)
         if: runner.os == 'Windows'
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v3
         with:
-          version: '6.10.0'
+          version: '6.6.3'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'
