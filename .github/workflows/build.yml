@@ -74,24 +74,41 @@ jobs:
           Invoke-WebRequest -Uri $FFMPEG_URL -OutFile "ffmpeg.zip" -UseBasicParsing
           Write-Host "Extracting FFmpeg..."
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg" -Force
-          # 查找解压后的目录结构
-          $ffmpegDir = Get-ChildItem -Directory -Path "ffmpeg" | Select-Object -First 1 -ExpandProperty FullName
-          # System233的构建结构: ffmpeg/include, ffmpeg/lib, ffmpeg/bin
-          # 如果有多层目录，进入第一层
-          if (-not (Test-Path "$ffmpegDir\include")) {
-            $ffmpegDir = Get-ChildItem -Directory -Path $ffmpegDir | Select-Object -First 1 -ExpandProperty FullName
+          # System233 zip 解压后直接是 ffmpeg/include, ffmpeg/lib, ffmpeg/bin (无外层目录)
+          # 或 ffmpeg/<subdir>/include (有外层目录)，两种情况都处理
+          $ffmpegBase = (Resolve-Path "ffmpeg").Path
+          $ffmpegDir = $null
+          if (Test-Path "$ffmpegBase\include") {
+            $ffmpegDir = $ffmpegBase
+          } else {
+            $subDirs = Get-ChildItem -Directory -Path $ffmpegBase
+            foreach ($subDir in $subDirs) {
+              if (Test-Path "$($subDir.FullName)\include") {
+                $ffmpegDir = $subDir.FullName
+                break
+              }
+            }
+          }
+          if (-not $ffmpegDir) {
+            Write-Error "Could not find FFmpeg include directory in $ffmpegBase"
+            Get-ChildItem -Recurse $ffmpegBase | Select-Object FullName | Format-Table -AutoSize
+            exit 1
           }
           echo "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "FFmpeg installed at: $ffmpegDir"
-          Write-Host "Directory structure:"
+          Write-Host "=== Directory structure ==="
           Get-ChildItem $ffmpegDir | Format-Table Name, Mode -AutoSize
           if (Test-Path "$ffmpegDir\lib") {
-            Write-Host "Lib files:"
+            Write-Host "=== Lib files ==="
             Get-ChildItem "$ffmpegDir\lib" | Format-Table Name -AutoSize
           }
           if (Test-Path "$ffmpegDir\bin") {
-            Write-Host "Dll files:"
+            Write-Host "=== Dll files ==="
             Get-ChildItem "$ffmpegDir\bin" -Filter "*.dll" | Format-Table Name -AutoSize
+          }
+          if (Test-Path "$ffmpegDir\include") {
+            Write-Host "=== Include subdirs ==="
+            Get-ChildItem "$ffmpegDir\include" -Directory | Format-Table Name -AutoSize
           }
 
       - name: Install dependencies (Linux)
@@ -118,7 +135,14 @@ jobs:
           mkdir build
           cd build
           $ffmpegDir = $env:FFMPEG_DIR
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release `
+          if (-not $ffmpegDir) {
+            Write-Error "FFMPEG_DIR is not set!"
+            exit 1
+          }
+          Write-Host "Using FFMPEG_ROOT=$ffmpegDir"
+          cmake .. -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DFFMPEG_ROOT="$ffmpegDir" `
             -DAVCODEC_INCLUDE_DIR="$ffmpegDir/include" `
             -DAVCODEC_LIBRARY="$ffmpegDir/lib/avcodec.lib" `
             -DAVFORMAT_INCLUDE_DIR="$ffmpegDir/include" `

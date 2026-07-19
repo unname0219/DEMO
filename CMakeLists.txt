@@ -33,18 +33,60 @@ if(PkgConfig_FOUND)
 endif()
 
 # 如果 pkg-config 找不到，尝试手动查找头文件和库
+# 支持通过 FFMPEG_ROOT 环境变量或 CMake 变量指定 FFmpeg 安装路径
 if(NOT FFMPEG_FOUND)
-    find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h)
-    find_library(AVCODEC_LIBRARY avcodec)
-    find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h)
-    find_library(AVFORMAT_LIBRARY avformat)
-    find_path(AVUTIL_INCLUDE_DIR libavutil/avutil.h)
-    find_library(AVUTIL_LIBRARY avutil)
-    find_path(SWSCALE_INCLUDE_DIR libswscale/swscale.h)
-    find_library(SWSCALE_LIBRARY swscale)
-    find_path(SWRESAMPLE_INCLUDE_DIR libswresample/swresample.h)
-    find_library(SWRESAMPLE_LIBRARY swresample)
-    
+    set(_FFMPEG_ROOT_HINTS "")
+    if(FFMPEG_ROOT)
+        set(_FFMPEG_ROOT_HINTS ${FFMPEG_ROOT})
+    endif()
+    if(DEFINED ENV{FFMPEG_DIR})
+        set(_FFMPEG_ROOT_HINTS ${_FFMPEG_ROOT_HINTS} $ENV{FFMPEG_DIR})
+    endif()
+    if(DEFINED ENV{FFMPEG_ROOT})
+        set(_FFMPEG_ROOT_HINTS ${_FFMPEG_ROOT_HINTS} $ENV{FFMPEG_ROOT})
+    endif()
+
+    find_path(AVCODEC_INCLUDE_DIR libavcodec/avcodec.h
+        PATHS ${_FFMPEG_ROOT_HINTS}/include
+        PATH_SUFFIXES include
+    )
+    find_library(AVCODEC_LIBRARY avcodec
+        PATHS ${_FFMPEG_ROOT_HINTS}/lib
+        PATH_SUFFIXES lib
+    )
+    find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h
+        PATHS ${_FFMPEG_ROOT_HINTS}/include
+        PATH_SUFFIXES include
+    )
+    find_library(AVFORMAT_LIBRARY avformat
+        PATHS ${_FFMPEG_ROOT_HINTS}/lib
+        PATH_SUFFIXES lib
+    )
+    find_path(AVUTIL_INCLUDE_DIR libavutil/avutil.h
+        PATHS ${_FFMPEG_ROOT_HINTS}/include
+        PATH_SUFFIXES include
+    )
+    find_library(AVUTIL_LIBRARY avutil
+        PATHS ${_FFMPEG_ROOT_HINTS}/lib
+        PATH_SUFFIXES lib
+    )
+    find_path(SWSCALE_INCLUDE_DIR libswscale/swscale.h
+        PATHS ${_FFMPEG_ROOT_HINTS}/include
+        PATH_SUFFIXES include
+    )
+    find_library(SWSCALE_LIBRARY swscale
+        PATHS ${_FFMPEG_ROOT_HINTS}/lib
+        PATH_SUFFIXES lib
+    )
+    find_path(SWRESAMPLE_INCLUDE_DIR libswresample/swresample.h
+        PATHS ${_FFMPEG_ROOT_HINTS}/include
+        PATH_SUFFIXES include
+    )
+    find_library(SWRESAMPLE_LIBRARY swresample
+        PATHS ${_FFMPEG_ROOT_HINTS}/lib
+        PATH_SUFFIXES lib
+    )
+
     if(AVCODEC_INCLUDE_DIR AND AVCODEC_LIBRARY AND AVFORMAT_INCLUDE_DIR AND AVFORMAT_LIBRARY)
         set(FFMPEG_FOUND TRUE)
         set(FFMPEG_INCLUDE_DIRS
@@ -62,6 +104,19 @@ if(NOT FFMPEG_FOUND)
             ${SWRESAMPLE_LIBRARY}
         )
     endif()
+endif()
+
+# 诊断输出
+message(STATUS "FFMPEG_FOUND = ${FFMPEG_FOUND}")
+if(FFMPEG_FOUND)
+    message(STATUS "FFMPEG_INCLUDE_DIRS = ${FFMPEG_INCLUDE_DIRS}")
+    message(STATUS "FFMPEG_LIBRARIES = ${FFMPEG_LIBRARIES}")
+endif()
+
+# 如果用户显式指定了 FFmpeg 路径但没找到，应该报错
+if(_FFMPEG_ROOT_HINTS AND NOT FFMPEG_FOUND)
+    message(FATAL_ERROR "FFmpeg was requested via FFMPEG_ROOT/FFMPEG_DIR but not found. "
+        "Check that the path contains include/ and lib/ subdirectories.")
 endif()
 
 if(NOT SOUNDTOUCH_FOUND)
