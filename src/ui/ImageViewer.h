@@ -6,6 +6,7 @@
 #include <QStringList>
 
 class QPushButton;
+class QSlider;
 
 class ImageViewer : public QWidget
 {
@@ -35,14 +36,20 @@ private slots:
     void zoomIn(const QPoint& mousePos = QPoint());
     void zoomOut(const QPoint& mousePos = QPoint());
     void resetZoom();
+    void fitToWindow();
+    void rotateImage();
+    void onZoomSliderChanged(int value);
 
 private:
     void setupUI();
+    void setupToolbar();
+    void repositionToolbar();
     void updateDisplay();
     void scanFolder();
     void updateNavButtons();
     void adjustOffset(const QPoint& mousePos, double oldScale);
     void centerImage();
+    void updateZoomSlider();
 
     QPushButton* m_prevBtn;
     QPushButton* m_nextBtn;
@@ -50,6 +57,7 @@ private:
     QImage m_originalImage;
     double m_scaleFactor;
     bool m_smoothScaling;
+    int m_rotationAngle;
 
     QString m_currentPath;
     QStringList m_imageFiles;
@@ -58,6 +66,11 @@ private:
     bool m_isDragging;
     QPoint m_lastMousePos;
     QPoint m_imageOffset;
+
+    QWidget* m_toolbar;
+    QSlider* m_zoomSlider;
+    QPushButton* m_fitBtn;
+    QPushButton* m_rotateBtn;
 };
 
 #endif

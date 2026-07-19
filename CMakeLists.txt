@@ -19,10 +19,15 @@ find_package(Qt6 REQUIRED COMPONENTS
     MultimediaWidgets
 )
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SOUNDTOUCH REQUIRED soundtouch)
+
 set(SOURCES
     src/main.cpp
     src/core/FileSignatureDetector.cpp
     src/core/PlayerController.cpp
+    src/core/PitchShifter.cpp
+    src/core/ProcessingAudioOutput.cpp
     src/ui/MainWindow.cpp
     src/ui/HeaderBar.cpp
     src/ui/MediaViewer.cpp
@@ -47,6 +52,8 @@ set(SOURCES
 set(HEADERS
     src/core/FileSignatureDetector.h
     src/core/PlayerController.h
+    src/core/PitchShifter.h
+    src/core/ProcessingAudioOutput.h
     src/ui/MainWindow.h
     src/ui/HeaderBar.h
     src/ui/MediaViewer.h
@@ -102,6 +109,7 @@ target_link_libraries(FireflyPlayer PRIVATE
     Qt6::Svg
     Qt6::Multimedia
     Qt6::MultimediaWidgets
+    ${SOUNDTOUCH_LIBRARIES}
 )
 
 if(WIN32)

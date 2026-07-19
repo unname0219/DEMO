@@ -414,8 +414,8 @@ void MainWindow::toggleFullScreen()
         // 进度条浮在上面
         m_progressBar->setParent(centralWidget());
         m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
+        m_progressBar->setVisible(true);
         m_progressBar->raise();
-        m_progressBar->show();
 
         // 控制栏浮在上面
         m_controlBar->setParent(centralWidget());
@@ -426,8 +426,8 @@ void MainWindow::toggleFullScreen()
             "#controlBar QPushButton { background-color: transparent; }"
             "#controlBar QLabel { color: white; }"
         );
+        m_controlBar->setVisible(true);
         m_controlBar->raise();
-        m_controlBar->show();
 
         m_isFullScreen = true;
         m_hideControlsTimer->start();
