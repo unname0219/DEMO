@@ -312,15 +312,17 @@ VideoFrame FFmpegDecoder::takeVideoFrame(qint64 positionMs)
     }
 
     // 取出所有 PTS <= positionMs 的帧，返回最后一帧（跳帧策略）
+    // 容差20ms，避免因为时钟微小差异导致帧延迟显示
     VideoFrame result;
     while (!m_videoQueue.isEmpty()) {
         const VideoFrame& head = m_videoQueue.head();
-        if (head.pts <= positionMs + 30) {
+        if (head.pts <= positionMs + 20) {
             result = m_videoQueue.dequeue();
         } else {
             break;
         }
     }
+    // 如果没取到帧但队列中有帧（即所有帧的PTS都在未来），保持上一帧
     return result;
 }
 
@@ -416,11 +418,11 @@ void FFmpegDecoder::decodeLoop()
         m_mutex.unlock();
 
         bool queueFull = false;
-        if (m_videoStreamIndex >= 0 && vqSize >= 5) queueFull = true;
-        if (m_audioStreamIndex >= 0 && aqSize >= 20) queueFull = true;
+        if (m_videoStreamIndex >= 0 && vqSize >= 15) queueFull = true;
+        if (m_audioStreamIndex >= 0 && aqSize >= 30) queueFull = true;
 
         if (queueFull) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
 

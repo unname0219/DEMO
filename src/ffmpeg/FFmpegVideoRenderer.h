@@ -32,8 +32,12 @@ private slots:
 private:
     FFmpegDecoder* m_decoder;
     QImage m_currentFrame;
+    QImage m_scaledFrame;
+    QSize m_lastRenderSize;
     QTimer* m_updateTimer;
     qint64 m_lastPts;
+    int m_frameCount;
+    qint64 m_lastFpsTime;
 };
 
 #endif

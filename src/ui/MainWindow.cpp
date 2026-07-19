@@ -432,14 +432,16 @@ void MainWindow::toggleFullScreen()
         m_mediaViewer->lower();
         m_mediaViewer->show();
 
-        // 进度条浮在上面
+        // 进度条浮在上面（强制原生窗口，确保能盖住QVideoWidget的原生渲染层）
         m_progressBar->setParent(centralWidget());
+        m_progressBar->setAttribute(Qt::WA_NativeWindow, true);
         m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
         m_progressBar->setVisible(true);
         m_progressBar->raise();
 
-        // 控制栏浮在上面
+        // 控制栏浮在上面（强制原生窗口）
         m_controlBar->setParent(centralWidget());
+        m_controlBar->setAttribute(Qt::WA_NativeWindow, true);
         m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
         m_controlBar->setObjectName("controlBar");
         m_controlBar->setStyleSheet(
