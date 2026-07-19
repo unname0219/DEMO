@@ -1,102 +1,156 @@
 #include "ffmpeg/FFmpegVideoRenderer.h"
 #include "ffmpeg/FFmpegDecoder.h"
-#include <QPainter>
-#include <QResizeEvent>
-#include <QElapsedTimer>
+
+static const char* vertexShaderSource = R"(
+    attribute vec2 a_position;
+    attribute vec2 a_texcoord;
+    varying vec2 v_texcoord;
+    void main() {
+        gl_Position = vec4(a_position, 0.0, 1.0);
+        v_texcoord = a_texcoord;
+    }
+)";
+
+static const char* fragmentShaderSource = R"(
+    varying vec2 v_texcoord;
+    uniform sampler2D u_texture;
+    void main() {
+        gl_FragColor = texture2D(u_texture, v_texcoord);
+    }
+)";
+
+struct Vertex {
+    float x, y;
+    float u, v;
+};
 
 FFmpegVideoRenderer::FFmpegVideoRenderer(QWidget* parent)
-    : QWidget(parent)
+    : QOpenGLWidget(parent)
     , m_decoder(nullptr)
     , m_updateTimer(nullptr)
     , m_lastPts(0)
-    , m_frameCount(0)
-    , m_lastFpsTime(0)
+    , m_program(nullptr)
+    , m_texture(0)
+    , m_frameUpdated(false)
 {
-    setAttribute(Qt::WA_OpaquePaintEvent, true);
     setMinimumSize(320, 240);
-    setStyleSheet("background-color: black;");
+    setAutoFillBackground(false);
+
+    QSurfaceFormat format;
+    format.setDepthBufferSize(0);
+    format.setStencilBufferSize(0);
+    format.setSamples(0);
+    setFormat(format);
 
     m_updateTimer = new QTimer(this);
     m_updateTimer->setTimerType(Qt::PreciseTimer);
-    m_updateTimer->setInterval(10); // 100FPS上限，由PTS同步控制实际帧率
+    m_updateTimer->setInterval(8);
     connect(m_updateTimer, &QTimer::timeout, this, &FFmpegVideoRenderer::updateFrame);
-
-    // 双缓冲：减少绘制时的等待
-    setAttribute(Qt::WA_PaintOnScreen, false);
+    m_updateTimer->start();
 }
 
 FFmpegVideoRenderer::~FFmpegVideoRenderer()
 {
+    makeCurrent();
+    if (m_texture) {
+        glDeleteTextures(1, &m_texture);
+        m_texture = 0;
+    }
+    delete m_program;
+    doneCurrent();
 }
 
 void FFmpegVideoRenderer::setDecoder(FFmpegDecoder* decoder)
 {
-    if (m_decoder) {
-        disconnect(m_decoder, &FFmpegDecoder::videoFrameReady,
-                   this, &FFmpegVideoRenderer::onVideoFrameReady);
-    }
-
     m_decoder = decoder;
-
-    if (m_decoder) {
-        connect(m_decoder, &FFmpegDecoder::videoFrameReady,
-                this, &FFmpegVideoRenderer::onVideoFrameReady);
-    }
-
-    m_currentFrame = QImage();
-    m_lastPts = 0;
-    update();
 }
 
 void FFmpegVideoRenderer::clearFrame()
 {
+    QMutexLocker locker(&m_textureMutex);
     m_currentFrame = QImage();
-    m_lastPts = 0;
+    m_pendingFrame = QImage();
+    m_frameUpdated = true;
     update();
 }
 
-void FFmpegVideoRenderer::paintEvent(QPaintEvent* event)
+void FFmpegVideoRenderer::initializeGL()
 {
-    Q_UNUSED(event);
-    QPainter painter(this);
-    painter.fillRect(rect(), Qt::black);
+    initializeOpenGLFunctions();
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+    m_program = new QOpenGLShaderProgram();
+    m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, vertexShaderSource);
+    m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentShaderSource);
+    m_program->link();
+    m_program->bind();
+
+    glGenTextures(1, &m_texture);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    m_vao.create();
+    m_vao.bind();
+
+    m_vbo.create();
+    m_vbo.setUsagePattern(QOpenGLBuffer::StaticDraw);
+    m_vbo.bind();
+
+    Vertex vertices[] = {
+        { -1.0f, -1.0f, 0.0f, 1.0f },
+        {  1.0f, -1.0f, 1.0f, 1.0f },
+        { -1.0f,  1.0f, 0.0f, 0.0f },
+        {  1.0f,  1.0f, 1.0f, 0.0f },
+    };
+    m_vbo.allocate(vertices, 4 * sizeof(Vertex));
+
+    int posLoc = m_program->attributeLocation("a_position");
+    int texLoc = m_program->attributeLocation("a_texcoord");
+
+    glEnableVertexAttribArray(posLoc);
+    glVertexAttribPointer(posLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+
+    glEnableVertexAttribArray(texLoc);
+    glVertexAttribPointer(texLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(2 * sizeof(float)));
+
+    m_vbo.release();
+    m_vao.release();
+    m_program->release();
+}
+
+void FFmpegVideoRenderer::paintGL()
+{
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    QMutexLocker locker(&m_textureMutex);
     if (m_currentFrame.isNull()) return;
 
-    QSize widgetSize = size();
-    // 只在尺寸变化或无缓存时重新缩放
-    if (m_lastRenderSize != widgetSize || m_scaledFrame.isNull()) {
-        QSize frameSize = m_currentFrame.size();
-        frameSize.scale(widgetSize, Qt::KeepAspectRatio);
-        if (frameSize.width() > 0 && frameSize.height() > 0) {
-            m_scaledFrame = m_currentFrame.scaled(frameSize, Qt::IgnoreAspectRatio, Qt::FastTransformation);
-        }
-        m_lastRenderSize = widgetSize;
+    if (m_frameUpdated) {
+        updateTexture(m_currentFrame);
+        m_frameUpdated = false;
     }
 
-    if (m_scaledFrame.isNull()) return;
+    if (!m_texture) return;
 
-    QRect targetRect(
-        (width() - m_scaledFrame.width()) / 2,
-        (height() - m_scaledFrame.height()) / 2,
-        m_scaledFrame.width(),
-        m_scaledFrame.height()
-    );
+    m_program->bind();
+    m_vao.bind();
 
-    painter.drawImage(targetRect, m_scaledFrame);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+    m_program->setUniformValue("u_texture", 0);
+
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+    m_vao.release();
+    m_program->release();
 }
 
-void FFmpegVideoRenderer::resizeEvent(QResizeEvent* event)
+void FFmpegVideoRenderer::resizeGL(int w, int h)
 {
-    QWidget::resizeEvent(event);
-    update();
-}
-
-void FFmpegVideoRenderer::onVideoFrameReady()
-{
-    if (!m_updateTimer->isActive()) {
-        m_updateTimer->start();
-    }
+    glViewport(0, 0, w, h);
 }
 
 void FFmpegVideoRenderer::updateFrame()
@@ -107,11 +161,42 @@ void FFmpegVideoRenderer::updateFrame()
 
     VideoFrame frame = m_decoder->takeVideoFrame(currentPos);
     if (!frame.image.isNull()) {
+        QMutexLocker locker(&m_textureMutex);
         m_currentFrame = frame.image;
-        // 帧变了，缩放缓存失效
-        m_scaledFrame = QImage();
+        m_frameUpdated = true;
         m_lastPts = frame.pts;
+        locker.unlock();
         emit frameDisplayed(frame.pts);
         update();
+    }
+}
+
+void FFmpegVideoRenderer::updateTexture(const QImage& image)
+{
+    if (image.isNull()) return;
+
+    GLenum format = GL_RGB;
+    QImage texImage = image;
+
+    if (image.format() == QImage::Format_RGB888) {
+        format = GL_RGB;
+    } else if (image.format() == QImage::Format_RGBA8888) {
+        format = GL_RGBA;
+    } else {
+        texImage = image.convertToFormat(QImage::Format_RGB888);
+        format = GL_RGB;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+
+    static int lastW = 0, lastH = 0;
+    if (texImage.width() != lastW || texImage.height() != lastH) {
+        glTexImage2D(GL_TEXTURE_2D, 0, format, texImage.width(), texImage.height(),
+                     0, format, GL_UNSIGNED_BYTE, texImage.bits());
+        lastW = texImage.width();
+        lastH = texImage.height();
+    } else {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texImage.width(), texImage.height(),
+                        format, GL_UNSIGNED_BYTE, texImage.bits());
     }
 }

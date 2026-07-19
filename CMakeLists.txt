@@ -17,6 +17,8 @@ find_package(Qt6 REQUIRED COMPONENTS
     Svg
     Multimedia
     MultimediaWidgets
+    OpenGL
+    OpenGLWidgets
 )
 
 # 优先使用系统安装的 SoundTouch；找不到则从源码编译
@@ -264,6 +266,8 @@ target_link_libraries(FireflyPlayer PRIVATE
     Qt6::Svg
     Qt6::Multimedia
     Qt6::MultimediaWidgets
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
     ${SOUNDTOUCH_LIBRARIES}
     ${FFMPEG_LIBRARIES}
 )

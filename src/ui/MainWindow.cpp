@@ -457,10 +457,14 @@ void MainWindow::toggleFullScreen()
         m_controlBar->setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
         m_controlBar->setGeometry(ctrlTopLeft.x(), ctrlTopLeft.y(), w, ctrlH);
         m_controlBar->setObjectName("controlBar");
+        m_controlBar->setAttribute(Qt::WA_TranslucentBackground, true);
         m_controlBar->setStyleSheet(
             "#controlBar { background-color: rgba(0,0,0,180); }"
-            "#controlBar QPushButton { background-color: transparent; }"
+            "#controlBar * { background-color: transparent; }"
             "#controlBar QLabel { color: white; }"
+            "#controlBar QPushButton { background-color: transparent; border: none; }"
+            "#controlBar QSlider::groove:horizontal { background: rgba(255,255,255,30); }"
+            "#controlBar QSlider::handle:horizontal { background: #00D4AA; }"
         );
         m_controlBar->show();
 

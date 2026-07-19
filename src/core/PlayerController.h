@@ -5,6 +5,7 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QUrl>
+#include <QTimer>
 
 #ifdef FFMPEG_ENABLED
 class FFmpegPlayer;
@@ -101,6 +102,8 @@ private:
     int m_volumeBeforeBoost;
     bool m_pitchCompensation;
     DecoderBackend m_decoderBackend;
+    QTimer* m_positionTimer;
+    qint64 m_lastEmittedPosition;
 
 #ifdef FFMPEG_ENABLED
     FFmpegPlayer* m_ffmpegPlayer;
