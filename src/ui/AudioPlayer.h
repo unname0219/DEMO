@@ -2,9 +2,8 @@
 #define AUDIOPLAYER_H
 
 #include <QWidget>
-#include <QLabel>
 #include <QTimer>
-#include <QPropertyAnimation>
+#include <QPixmap>
 
 class PlayerController;
 
@@ -29,11 +28,9 @@ protected:
 
 private:
     void setupUI();
-    void updateDiscSize();
+    int discSize() const;
 
-    QLabel* m_discLabel;
     QTimer* m_rotationTimer;
-    QPropertyAnimation* m_rotationAnimation;
     PlayerController* m_controller;
     qreal m_rotationAngle;
     bool m_isPlaying;

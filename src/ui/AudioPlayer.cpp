@@ -2,17 +2,13 @@
 #include "core/PlayerController.h"
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
-#include <QVBoxLayout>
 #include <QPainter>
 #include <QPixmap>
 #include <QPainterPath>
-#include <QGraphicsRotation>
 
 AudioPlayer::AudioPlayer(QWidget* parent)
     : QWidget(parent)
-    , m_discLabel(nullptr)
     , m_rotationTimer(nullptr)
-    , m_rotationAnimation(nullptr)
     , m_controller(nullptr)
     , m_rotationAngle(0.0)
     , m_isPlaying(false)
@@ -26,16 +22,6 @@ AudioPlayer::~AudioPlayer()
 
 void AudioPlayer::setupUI()
 {
-    setStyleSheet("background-color: #1a1a1a;");
-
-    QVBoxLayout* layout = new QVBoxLayout(this);
-    layout->setAlignment(Qt::AlignCenter);
-
-    m_discLabel = new QLabel(this);
-    m_discLabel->setAlignment(Qt::AlignCenter);
-    m_discLabel->setFixedSize(DPIAdapter::scaledSize(280), DPIAdapter::scaledSize(280));
-    layout->addWidget(m_discLabel, 0, Qt::AlignCenter);
-
     m_rotationTimer = new QTimer(this);
     m_rotationTimer->setInterval(50);
     connect(m_rotationTimer, &QTimer::timeout, this, [this]() {
@@ -49,6 +35,15 @@ void AudioPlayer::setupUI()
     });
 
     showDefaultCover();
+    setMinimumSize(DPIAdapter::scaledSize(300), DPIAdapter::scaledSize(300));
+}
+
+int AudioPlayer::discSize() const
+{
+    int size = qMin(width(), height()) * 0.6;
+    if (size < DPIAdapter::scaledSize(120)) size = DPIAdapter::scaledSize(120);
+    if (size > DPIAdapter::scaledSize(400)) size = DPIAdapter::scaledSize(400);
+    return size;
 }
 
 void AudioPlayer::showDefaultCover()
@@ -61,7 +56,6 @@ void AudioPlayer::showDefaultCover()
 
     QRectF discRect(0, 0, size, size);
 
-    // 唱片外圈（黑胶效果）
     QRadialGradient gradient(discRect.center(), size / 2.0);
     gradient.setColorAt(0.0, QColor(40, 40, 40));
     gradient.setColorAt(0.7, QColor(25, 25, 25));
@@ -71,7 +65,6 @@ void AudioPlayer::showDefaultCover()
     painter.setPen(Qt::NoPen);
     painter.drawEllipse(discRect);
 
-    // 唱片纹理
     painter.setPen(QColor(60, 60, 60, 80));
     for (int i = 0; i < 15; i++) {
         qreal ratio = 0.3 + i * 0.04;
@@ -80,7 +73,6 @@ void AudioPlayer::showDefaultCover()
         painter.drawEllipse(discRect.center(), r, r);
     }
 
-    // 中心标签（音符图标位置）
     qreal labelSize = size * 0.35;
     QRectF labelRect((size - labelSize) / 2.0, (size - labelSize) / 2.0, labelSize, labelSize);
     QRadialGradient labelGrad(labelRect.center(), labelSize / 2.0);
@@ -90,14 +82,13 @@ void AudioPlayer::showDefaultCover()
     painter.setPen(Qt::NoPen);
     painter.drawEllipse(labelRect);
 
-    // 中心孔
     qreal holeSize = size * 0.06;
     QRectF holeRect((size - holeSize) / 2.0, (size - holeSize) / 2.0, holeSize, holeSize);
     painter.setBrush(QColor(20, 20, 20));
     painter.drawEllipse(holeRect);
 
     m_defaultCover = disc;
-    updateDiscDisplay();
+    update();
 }
 
 void AudioPlayer::setCoverImage(const QPixmap& pixmap)
@@ -116,7 +107,6 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
 
     QRectF discRect(0, 0, size, size);
 
-    // 黑胶外圈
     QRadialGradient gradient(discRect.center(), size / 2.0);
     gradient.setColorAt(0.0, QColor(40, 40, 40));
     gradient.setColorAt(0.7, QColor(25, 25, 25));
@@ -126,7 +116,6 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
     painter.setPen(Qt::NoPen);
     painter.drawEllipse(discRect);
 
-    // 唱片纹理
     painter.setPen(QColor(60, 60, 60, 80));
     for (int i = 0; i < 12; i++) {
         qreal ratio = 0.78 + i * 0.015;
@@ -135,7 +124,6 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
         painter.drawEllipse(discRect.center(), r, r);
     }
 
-    // 专辑封面（圆形，中间区域）
     qreal coverSize = size * 0.7;
     QRectF coverRect((size - coverSize) / 2.0, (size - coverSize) / 2.0, coverSize, coverSize);
 
@@ -143,7 +131,6 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
     QPainterPath coverPath;
     coverPath.addEllipse(coverRect);
     painter.setClipPath(coverPath);
-    QRectF scaledCoverRect(coverRect.x(), coverRect.y(), coverSize, coverSize);
     if (scaledCover.width() > scaledCover.height()) {
         int xOffset = (scaledCover.width() - coverSize) / 2;
         painter.drawPixmap(coverRect.topLeft(), scaledCover.copy(xOffset, 0, coverSize, coverSize));
@@ -153,7 +140,6 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
     }
     painter.setClipping(false);
 
-    // 中心孔
     qreal holeSize = size * 0.06;
     QRectF holeRect((size - holeSize) / 2.0, (size - holeSize) / 2.0, holeSize, holeSize);
     painter.setBrush(QColor(20, 20, 20));
@@ -161,7 +147,7 @@ void AudioPlayer::setCoverImage(const QPixmap& pixmap)
     painter.drawEllipse(holeRect);
 
     m_defaultCover = disc;
-    updateDiscDisplay();
+    update();
 }
 
 void AudioPlayer::setMediaPlayer(PlayerController* controller)
@@ -176,20 +162,6 @@ void AudioPlayer::onPlaybackStateChanged(bool playing)
     m_isPlaying = playing;
 }
 
-void AudioPlayer::updateDiscSize()
-{
-    int size = qMin(width(), height()) * 0.6;
-    if (size < DPIAdapter::scaledSize(120)) size = DPIAdapter::scaledSize(120);
-    if (size > DPIAdapter::scaledSize(400)) size = DPIAdapter::scaledSize(400);
-    m_discLabel->setFixedSize(size, size);
-}
-
-void AudioPlayer::updateDiscDisplay()
-{
-    if (m_defaultCover.isNull()) return;
-    m_discLabel->setPixmap(m_defaultCover);
-}
-
 void AudioPlayer::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
@@ -201,20 +173,23 @@ void AudioPlayer::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    int discSize = m_discLabel->width();
+    int size = discSize();
     QPoint center = rect().center();
-    QPoint discTopLeft(center.x() - discSize / 2, center.y() - discSize / 2);
 
     painter.save();
     painter.translate(center);
     painter.rotate(m_rotationAngle);
     painter.translate(-center);
-    painter.drawPixmap(discTopLeft, m_defaultCover.scaled(discSize, discSize, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    QPixmap scaled = m_defaultCover.scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    QPoint topLeft(center.x() - size / 2, center.y() - size / 2);
+    painter.drawPixmap(topLeft, scaled);
+
     painter.restore();
 }
 
 void AudioPlayer::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
-    updateDiscSize();
+    update();
 }
