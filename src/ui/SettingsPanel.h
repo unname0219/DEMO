@@ -48,6 +48,8 @@ private:
     QStackedWidget* m_contentStack;
     QWidget* m_titleBar;
     QLabel* m_titleLabel;
+    QList<QLabel*> m_shortcutDescLabels;
+    QList<QLabel*> m_aboutLabels;
     QList<QCheckBox*> m_videoCheckboxes;
     QList<QCheckBox*> m_audioCheckboxes;
     QList<QCheckBox*> m_imageCheckboxes;

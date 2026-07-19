@@ -70,11 +70,12 @@ void SettingsPanel::setupUI()
     titleLayout->setSpacing(DPIAdapter::scaledSize(8));
 
     QLabel* titleLabel = new QLabel("设置", m_titleBar);
+    m_titleLabel = titleLabel;
     QFont titleFont = titleLabel->font();
     titleFont.setBold(true);
     titleFont.setPointSizeF(DPIAdapter::scaledFontSize(11));
     titleLabel->setFont(titleFont);
-    titleLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
+    updateTitleStyle();
     titleLayout->addWidget(titleLabel);
 
     titleLayout->addStretch();
@@ -179,7 +180,37 @@ void SettingsPanel::setupUI()
     connect(m_navList, &QListWidget::currentRowChanged, m_contentStack, &QStackedWidget::setCurrentIndex);
 
     connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, &SettingsPanel::updateNavListStyle);
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged, this, &SettingsPanel::updateTitleStyle);
     updateNavListStyle();
+    updateTitleStyle();
+}
+
+void SettingsPanel::updateTitleStyle()
+{
+    QString textColor = ThemeManager::instance()->textColor();
+    QString hoverColor = ThemeManager::instance()->isDarkMode() ? "#3A3A3A" : "#E8E3D8";
+
+    if (m_titleLabel) {
+        m_titleLabel->setStyleSheet(QString("color: %1;").arg(textColor));
+    }
+
+    foreach (QLabel* label, m_shortcutDescLabels) {
+        label->setStyleSheet(QString("color: %1;").arg(textColor));
+    }
+
+    foreach (QLabel* label, m_aboutLabels) {
+        label->setStyleSheet(QString("color: %1;").arg(textColor));
+    }
+
+    foreach (QWidget* w, findChildren<QWidget*>()) {
+        QLabel* label = qobject_cast<QLabel*>(w);
+        if (label && label->styleSheet().contains("monospace")) {
+            label->setStyleSheet(
+                QString("background: %1; color: %2; padding: 4px 14px; border-radius: 4px; font-family: monospace;")
+                .arg(hoverColor, textColor)
+            );
+        }
+    }
 }
 
 void SettingsPanel::updateNavListStyle()
@@ -542,11 +573,10 @@ void SettingsPanel::setupShortcutsPage(QWidget* page)
         rowLayout->setSpacing(DPIAdapter::scaledSize(8));
 
         QLabel* keyLabel = new QLabel(sc.key, row);
-        QString bgColor = ThemeManager::instance()->isDarkMode() ? "#3A3A3A" : "#E8E3D8";
         QString textColor = ThemeManager::instance()->textColor();
         keyLabel->setStyleSheet(
             QString("background: %1; color: %2; padding: 4px 14px; border-radius: 4px; font-family: monospace;")
-            .arg(bgColor, textColor)
+            .arg(ThemeManager::instance()->isDarkMode() ? "#3A3A3A" : "#E8E3D8", textColor)
         );
         keyLabel->setFixedWidth(DPIAdapter::scaledSize(140));
         keyLabel->setAlignment(Qt::AlignCenter);
@@ -554,6 +584,7 @@ void SettingsPanel::setupShortcutsPage(QWidget* page)
 
         QLabel* descLabel = new QLabel(sc.desc, row);
         descLabel->setStyleSheet(QString("color: %1;").arg(textColor));
+        m_shortcutDescLabels.append(descLabel);
         rowLayout->addWidget(descLabel, 1);
 
         scrollLayout->addWidget(row);
@@ -584,6 +615,7 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     nameLabel->setFont(nameFont);
     nameLabel->setAlignment(Qt::AlignCenter);
     nameLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
+    m_aboutLabels.append(nameLabel);
     layout->addWidget(nameLabel);
 
     QLabel* versionLabel = new QLabel("版本 1.4.0", page);
@@ -592,6 +624,7 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     versionLabel->setFont(versionFont);
     versionLabel->setAlignment(Qt::AlignCenter);
     versionLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
+    m_aboutLabels.append(versionLabel);
     layout->addWidget(versionLabel);
 
     layout->addStretch();
@@ -603,15 +636,17 @@ void SettingsPanel::setupAboutPage(QWidget* page)
     descLabel->setAlignment(Qt::AlignCenter);
     descLabel->setWordWrap(true);
     descLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
+    m_aboutLabels.append(descLabel);
     layout->addWidget(descLabel);
 
-    QLabel* authorLabel = new QLabel("© 2024 Firefly", page);
-    QFont authorFont = authorLabel->font();
-    authorFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
-    authorLabel->setFont(authorFont);
-    authorLabel->setAlignment(Qt::AlignCenter);
-    authorLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
-    layout->addWidget(authorLabel);
+    QLabel* copyrightLabel = new QLabel("© 2024 Firefly", page);
+    QFont copyrightFont = copyrightLabel->font();
+    copyrightFont.setPointSizeF(DPIAdapter::scaledFontSize(9));
+    copyrightLabel->setFont(copyrightFont);
+    copyrightLabel->setAlignment(Qt::AlignCenter);
+    copyrightLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
+    m_aboutLabels.append(copyrightLabel);
+    layout->addWidget(copyrightLabel);
 }
 
 void SettingsPanel::showEvent(QShowEvent* event)
