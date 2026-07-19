@@ -66,6 +66,8 @@ private slots:
     void onVolumeBoostCheck(int value);
 
 private:
+    void applyPitchCompensation();
+
     QMediaPlayer* m_mediaPlayer;
     QAudioOutput* m_audioOutput;
     PlaybackState m_playbackState;

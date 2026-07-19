@@ -64,6 +64,7 @@ void SettingsPanel::setupUI()
     m_titleBar = new QWidget(this);
     m_titleBar->setFixedHeight(DPIAdapter::scaledSize(36));
     m_titleBar->setCursor(Qt::SizeAllCursor);
+    m_titleBar->setStyleSheet(QString("background-color: %1;").arg(ThemeManager::instance()->headerBackgroundColor()));
     QHBoxLayout* titleLayout = new QHBoxLayout(m_titleBar);
     titleLayout->setContentsMargins(DPIAdapter::scaledSize(12), 0, DPIAdapter::scaledSize(8), 0);
     titleLayout->setSpacing(DPIAdapter::scaledSize(8));
@@ -540,14 +541,18 @@ void SettingsPanel::setupShortcutsPage(QWidget* page)
         rowLayout->setContentsMargins(0, 6, 0, 6);
 
         QLabel* keyLabel = new QLabel(sc.key, row);
+        QString bgColor = ThemeManager::instance()->isDarkMode() ? "#3A3A3A" : "#E8E3D8";
+        QString textColor = ThemeManager::instance()->textColor();
         keyLabel->setStyleSheet(
-            "background: #3A3A3A; padding: 4px 14px; border-radius: 4px; font-family: monospace;"
+            QString("background: %1; color: %2; padding: 4px 14px; border-radius: 4px; font-family: monospace;")
+            .arg(bgColor, textColor)
         );
         keyLabel->setFixedWidth(DPIAdapter::scaledSize(140));
         keyLabel->setAlignment(Qt::AlignCenter);
         rowLayout->addWidget(keyLabel);
 
         QLabel* descLabel = new QLabel(sc.desc, row);
+        descLabel->setStyleSheet(QString("color: %1;").arg(ThemeManager::instance()->textColor()));
         rowLayout->addWidget(descLabel, 1);
 
         scrollLayout->addWidget(row);

@@ -368,8 +368,7 @@ void MainWindow::toggleFullScreen()
 {
     if (m_isFullScreen) {
         showNormal();
-        setContentsMargins(DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8),
-                           DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+        setContentsMargins(0, 0, 0, 0);
         m_headerBar->show();
         m_progressBar->show();
         m_controlBar->show();
