@@ -9,6 +9,7 @@
 #include <QStackedWidget>
 #include <QListWidget>
 #include <QCheckBox>
+#include <QLabel>
 
 class SettingsPanel : public QDialog
 {

@@ -45,8 +45,8 @@ void SettingsPanel::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     QColor bg = ThemeManager::instance()->backgroundColor();
     painter.setBrush(QBrush(bg));
-    painter.setPen(Qt::NoPen);
-    painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 
+    painter.setPen(QPen(QColor(ThemeManager::instance()->primaryColor()), DPIAdapter::scaledSize(2)));
+    painter.drawRoundedRect(rect().adjusted(1, 1, -2, -2), 
                             DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
 }
 
