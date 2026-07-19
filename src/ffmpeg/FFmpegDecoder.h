@@ -62,13 +62,18 @@ public:
 
     QAudioFormat audioFormat() const { return m_audioFormat; }
 
-    VideoFrame currentVideoFrame();
+    VideoFrame takeVideoFrame(qint64 positionMs);
     AudioFrame currentAudioFrame();
 
     void setPlaybackSpeed(double speed);
     double playbackSpeed() const { return m_playbackSpeed; }
 
+    void updatePosition();
+
     void decodeLoop();
+
+    bool isDecodeFinished() const { return m_decodeFinished; }
+    bool isQueueEmpty() const;
 
 signals:
     void videoFrameReady();
@@ -107,6 +112,7 @@ private:
     bool m_isPaused;
     bool m_isStopRequested;
     bool m_isSeekRequested;
+    bool m_decodeFinished;
     qint64 m_seekPositionMs;
 
     int m_videoWidth;

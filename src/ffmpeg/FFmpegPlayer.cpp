@@ -13,6 +13,7 @@ FFmpegPlayer::FFmpegPlayer(QObject* parent)
     , m_audioSink(nullptr)
     , m_audioDevice(nullptr)
     , m_positionTimer(nullptr)
+    , m_audioWriteTimer(nullptr)
     , m_state(StoppedState)
     , m_volume(80)
     , m_isMuted(false)
@@ -32,9 +33,14 @@ FFmpegPlayer::FFmpegPlayer(QObject* parent)
             this, &FFmpegPlayer::onDecoderError);
 
     m_positionTimer = new QTimer(this);
-    m_positionTimer->setInterval(100);
+    m_positionTimer->setInterval(50);
     connect(m_positionTimer, &QTimer::timeout,
             this, &FFmpegPlayer::updatePosition);
+
+    m_audioWriteTimer = new QTimer(this);
+    m_audioWriteTimer->setInterval(20);
+    connect(m_audioWriteTimer, &QTimer::timeout,
+            this, &FFmpegPlayer::writeAudioData);
 }
 
 FFmpegPlayer::~FFmpegPlayer()
@@ -79,6 +85,9 @@ void FFmpegPlayer::close()
 {
     stopAudioOutput();
 
+    if (m_positionTimer) m_positionTimer->stop();
+    if (m_audioWriteTimer) m_audioWriteTimer->stop();
+
     if (m_audioSink) {
         m_audioSink->stop();
         delete m_audioSink;
@@ -107,6 +116,7 @@ void FFmpegPlayer::play()
 
     if (hasAudio()) {
         startAudioOutput();
+        m_audioWriteTimer->start();
     }
 }
 
@@ -129,6 +139,7 @@ void FFmpegPlayer::stop()
 {
     m_decoder->stop();
     m_positionTimer->stop();
+    m_audioWriteTimer->stop();
     stopAudioOutput();
     m_audioBuffer.clear();
     m_audioOutputStarted = false;
@@ -229,31 +240,13 @@ void FFmpegPlayer::onVideoFrameReady()
 
 void FFmpegPlayer::onAudioFrameReady()
 {
-    if (!hasAudio()) return;
-
-    AudioFrame frame = m_decoder->currentAudioFrame();
-    if (frame.data.isEmpty()) return;
-
-    m_audioBuffer.append(frame.data);
-
-    if (m_audioSink && m_audioDevice && m_state == PlayingState) {
-        qint64 bytesFree = m_audioSink->bytesFree();
-        if (bytesFree > 0 && m_audioBuffer.size() > 0) {
-            qint64 toWrite = qMin((qint64)m_audioBuffer.size(), bytesFree);
-            qint64 written = m_audioDevice->write(m_audioBuffer.constData(), toWrite);
-            if (written > 0) {
-                m_audioBuffer.remove(0, written);
-            }
-        }
-    }
+    // 音频帧已放入 decoder 队列，由 writeAudioData 主动取
 }
 
 void FFmpegPlayer::onDecoderFinished()
 {
-    m_state = StoppedState;
-    m_positionTimer->stop();
-    emit stateChanged(m_state);
-    emit finished();
+    // 不立即停止，等位置到末尾
+    // 由 updatePosition 检查位置和队列状态
 }
 
 void FFmpegPlayer::onDecoderError(const QString& message)
@@ -263,8 +256,45 @@ void FFmpegPlayer::onDecoderError(const QString& message)
 
 void FFmpegPlayer::updatePosition()
 {
-    if (m_decoder) {
-        emit positionChanged(m_decoder->currentPosition());
+    if (!m_decoder) return;
+
+    // 由主线程定时器驱动位置更新（基于系统时间）
+    m_decoder->updatePosition();
+
+    qint64 pos = m_decoder->currentPosition();
+    emit positionChanged(pos);
+
+    // 检查播放完成：解码完成 + 位置到末尾 + 队列空
+    if (m_state == PlayingState && m_decoder->isDecodeFinished()) {
+        if (pos >= m_decoder->duration() - 100 && m_decoder->isQueueEmpty()) {
+            m_state = StoppedState;
+            m_positionTimer->stop();
+            if (m_audioWriteTimer) m_audioWriteTimer->stop();
+            stopAudioOutput();
+            emit stateChanged(m_state);
+            emit finished();
+        }
+    }
+}
+
+void FFmpegPlayer::writeAudioData()
+{
+    if (!m_audioSink || !m_audioDevice || m_state != PlayingState) return;
+
+    // 主动从 decoder 队列取音频帧补充 buffer
+    while (m_audioBuffer.size() < 16384) {
+        AudioFrame frame = m_decoder->currentAudioFrame();
+        if (frame.data.isEmpty()) break;
+        m_audioBuffer.append(frame.data);
+    }
+
+    qint64 bytesFree = m_audioSink->bytesFree();
+    if (bytesFree <= 0 || m_audioBuffer.isEmpty()) return;
+
+    qint64 toWrite = qMin((qint64)m_audioBuffer.size(), bytesFree);
+    qint64 written = m_audioDevice->write(m_audioBuffer.constData(), toWrite);
+    if (written > 0) {
+        m_audioBuffer.remove(0, written);
     }
 }
 

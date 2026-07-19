@@ -67,6 +67,7 @@ private slots:
     void onDecoderFinished();
     void onDecoderError(const QString& message);
     void updatePosition();
+    void writeAudioData();
 
 private:
     void initAudioOutput();
@@ -79,6 +80,7 @@ private:
     QIODevice* m_audioDevice;
 
     QTimer* m_positionTimer;
+    QTimer* m_audioWriteTimer;
 
     PlaybackState m_state;
     int m_volume;

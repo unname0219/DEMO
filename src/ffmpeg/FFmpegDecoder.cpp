@@ -19,6 +19,7 @@ FFmpegDecoder::FFmpegDecoder(QObject* parent)
     , m_isPaused(false)
     , m_isStopRequested(false)
     , m_isSeekRequested(false)
+    , m_decodeFinished(false)
     , m_seekPositionMs(0)
     , m_videoWidth(0)
     , m_videoHeight(0)
@@ -243,6 +244,7 @@ void FFmpegDecoder::close()
     m_isPlaying = false;
     m_isPaused = false;
     m_isStopRequested = false;
+    m_decodeFinished = false;
 }
 
 void FFmpegDecoder::start()
@@ -252,9 +254,10 @@ void FFmpegDecoder::start()
     m_isPlaying = true;
     m_isPaused = false;
     m_isStopRequested = false;
+    m_decodeFinished = false;
 
     m_mutex.lock();
-    m_startTime = av_gettime() - m_currentPositionMs * 1000;
+    m_startTime = av_gettime() - (qint64)(m_currentPositionMs * 1000 * m_playbackSpeed);
     m_mutex.unlock();
 
     m_waitCondition.wakeAll();
@@ -270,7 +273,11 @@ void FFmpegDecoder::pause()
         m_pauseTime = av_gettime();
         emit stateChanged(false);
     } else {
-        m_startTime = av_gettime() - m_currentPositionMs * 1000;
+        m_mutex.lock();
+        // 暂停期间补偿时间
+        qint64 pausedDuration = av_gettime() - m_pauseTime;
+        m_startTime += pausedDuration;
+        m_mutex.unlock();
         m_waitCondition.wakeAll();
         emit stateChanged(true);
     }
@@ -293,16 +300,28 @@ void FFmpegDecoder::seek(qint64 positionMs)
     QMutexLocker locker(&m_mutex);
     m_isSeekRequested = true;
     m_seekPositionMs = positionMs;
+    m_decodeFinished = false;
     m_waitCondition.wakeAll();
 }
 
-VideoFrame FFmpegDecoder::currentVideoFrame()
+VideoFrame FFmpegDecoder::takeVideoFrame(qint64 positionMs)
 {
     QMutexLocker locker(&m_mutex);
     if (m_videoQueue.isEmpty()) {
         return VideoFrame();
     }
-    return m_videoQueue.head();
+
+    // 取出所有 PTS <= positionMs 的帧，返回最后一帧（跳帧策略）
+    VideoFrame result;
+    while (!m_videoQueue.isEmpty()) {
+        const VideoFrame& head = m_videoQueue.head();
+        if (head.pts <= positionMs + 30) {
+            result = m_videoQueue.dequeue();
+        } else {
+            break;
+        }
+    }
+    return result;
 }
 
 AudioFrame FFmpegDecoder::currentAudioFrame()
@@ -315,11 +334,32 @@ AudioFrame FFmpegDecoder::currentAudioFrame()
     return frame;
 }
 
+bool FFmpegDecoder::isQueueEmpty() const
+{
+    QMutexLocker locker(&m_mutex);
+    return m_videoQueue.isEmpty() && m_audioQueue.isEmpty();
+}
+
 void FFmpegDecoder::setPlaybackSpeed(double speed)
 {
     QMutexLocker locker(&m_mutex);
+    qint64 currentPos = m_currentPositionMs;
     m_playbackSpeed = speed;
-    m_startTime = av_gettime() - (qint64)(m_currentPositionMs * 1000 / speed);
+    m_startTime = av_gettime() - (qint64)(currentPos * 1000 * speed);
+}
+
+void FFmpegDecoder::updatePosition()
+{
+    QMutexLocker locker(&m_mutex);
+    if (m_isPaused || !m_isPlaying) return;
+
+    qint64 elapsed = (av_gettime() - m_startTime) / 1000;
+    qint64 newPos = (qint64)(elapsed / m_playbackSpeed);
+    if (newPos > m_currentPositionMs && newPos <= m_durationMs) {
+        m_currentPositionMs = newPos;
+    } else if (newPos > m_durationMs) {
+        m_currentPositionMs = m_durationMs;
+    }
 }
 
 void FFmpegDecoder::decodeLoop()
@@ -334,12 +374,13 @@ void FFmpegDecoder::decodeLoop()
     QQueue<AudioFrame> audioQueue;
 
     m_isStopRequested = false;
+    m_decodeFinished = false;
 
     while (!m_isStopRequested) {
         m_mutex.lock();
         if (m_isPaused) {
             m_mutex.unlock();
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
             continue;
         }
         m_mutex.unlock();
@@ -356,24 +397,68 @@ void FFmpegDecoder::decodeLoop()
                 if (m_audioCodecCtx) avcodec_flush_buffers(m_audioCodecCtx);
                 videoQueue.clear();
                 audioQueue.clear();
+                m_decodeFinished = false;
             }
 
             m_mutex.lock();
             m_isSeekRequested = false;
             m_currentPositionMs = seekPos;
-            m_startTime = av_gettime() - (qint64)(seekPos * 1000 / m_playbackSpeed);
+            m_startTime = av_gettime() - (qint64)(seekPos * 1000 * m_playbackSpeed);
             m_mutex.unlock();
             continue;
         }
         m_mutex.unlock();
+
+        // 检查队列水位，满则等待（控制解码速度）
+        m_mutex.lock();
+        int vqSize = m_videoQueue.size();
+        int aqSize = m_audioQueue.size();
+        m_mutex.unlock();
+
+        bool queueFull = false;
+        if (m_videoStreamIndex >= 0 && vqSize >= 5) queueFull = true;
+        if (m_audioStreamIndex >= 0 && aqSize >= 20) queueFull = true;
+
+        if (queueFull) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            continue;
+        }
+
+        // 如果解码已完成，等待队列消费
+        if (m_decodeFinished) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            continue;
+        }
 
         int ret = av_read_frame(m_formatCtx, pkt);
         if (ret < 0) {
             if (ret == AVERROR_EOF) {
                 if (m_videoCodecCtx) flushDecoder(m_videoCodecCtx, videoFrame, true, videoQueue, audioQueue);
                 if (m_audioCodecCtx) flushDecoder(m_audioCodecCtx, audioFrame, false, videoQueue, audioQueue);
-                emit finished();
-                m_isPlaying = false;
+
+                // 转移剩余帧到主队列
+                m_mutex.lock();
+                while (!videoQueue.isEmpty() && m_videoQueue.size() < 30) {
+                    m_videoQueue.enqueue(videoQueue.dequeue());
+                    emit videoFrameReady();
+                }
+                while (!audioQueue.isEmpty() && m_audioQueue.size() < 50) {
+                    m_audioQueue.enqueue(audioQueue.dequeue());
+                    emit audioFrameReady();
+                }
+                m_decodeFinished = true;
+                m_mutex.unlock();
+                // 不立即emit finished()，由FFmpegPlayer根据position判断
+                // 等待队列消费完
+                while (!m_isStopRequested) {
+                    m_mutex.lock();
+                    if (m_videoQueue.isEmpty() && m_audioQueue.isEmpty()) {
+                        m_mutex.unlock();
+                        break;
+                    }
+                    m_mutex.unlock();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                }
                 break;
             }
             break;
@@ -398,25 +483,7 @@ void FFmpegDecoder::decodeLoop()
             m_audioQueue.enqueue(audioQueue.dequeue());
             emit audioFrameReady();
         }
-
-        if (currentPts > 0) {
-            m_currentPositionMs = qMin(currentPts, m_durationMs);
-        } else {
-            qint64 elapsed = (av_gettime() - m_startTime) / 1000;
-            m_currentPositionMs = qMin((qint64)(elapsed / m_playbackSpeed), m_durationMs);
-        }
         m_mutex.unlock();
-
-        int videoSize = 0;
-        int audioSize = 0;
-        m_mutex.lock();
-        videoSize = m_videoQueue.size();
-        audioSize = m_audioQueue.size();
-        m_mutex.unlock();
-
-        if (videoSize > 20 || (m_videoStreamIndex < 0 && audioSize > 30)) {
-            std::this_thread::sleep_for(std::chrono::microseconds(10000));
-        }
     }
 
     av_frame_free(&videoFrame);

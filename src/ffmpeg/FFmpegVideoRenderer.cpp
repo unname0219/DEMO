@@ -86,12 +86,10 @@ void FFmpegVideoRenderer::updateFrame()
 {
     if (!m_decoder) return;
 
-    VideoFrame frame = m_decoder->currentVideoFrame();
-    if (frame.image.isNull()) return;
-
     qint64 currentPos = m_decoder->currentPosition();
 
-    if (frame.pts <= currentPos + 50 || m_lastPts == 0) {
+    VideoFrame frame = m_decoder->takeVideoFrame(currentPos);
+    if (!frame.image.isNull()) {
         m_currentFrame = frame.image;
         m_lastPts = frame.pts;
         emit frameDisplayed(frame.pts);
