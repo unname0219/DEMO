@@ -68,6 +68,8 @@ public:
     void setPlaybackSpeed(double speed);
     double playbackSpeed() const { return m_playbackSpeed; }
 
+    void decodeLoop();
+
 signals:
     void videoFrameReady();
     void audioFrameReady();
@@ -78,8 +80,6 @@ signals:
     void error(const QString& message);
 
 private:
-    void decodeLoop();
-
     bool openCodec(AVCodecParameters* codecpar, AVCodecContext** codecCtx,
                    AVStream* stream, bool isVideo, DecodeMode mode);
     bool initHardwareDecoder(AVCodecContext* codecCtx, AVCodecParameters* codecpar);
