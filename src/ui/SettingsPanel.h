@@ -40,12 +40,14 @@ private:
     void setupAboutPage(QWidget* page);
     void refreshFileAssocPage();
     void updateNavListStyle();
+    void updateTitleStyle();
     void saveSettings();
 
     QTabWidget* m_tabWidget;
     QListWidget* m_navList;
     QStackedWidget* m_contentStack;
     QWidget* m_titleBar;
+    QLabel* m_titleLabel;
     QList<QCheckBox*> m_videoCheckboxes;
     QList<QCheckBox*> m_audioCheckboxes;
     QList<QCheckBox*> m_imageCheckboxes;
