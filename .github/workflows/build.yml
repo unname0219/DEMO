@@ -47,7 +47,7 @@ jobs:
         if: runner.os == 'Linux'
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.6.3'
+          version: '6.10.0'
           host: 'linux'
           target: 'desktop'
           arch: 'gcc_64'
@@ -58,7 +58,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: jurplel/install-qt-action@v3
         with:
-          version: '6.6.3'
+          version: '6.10.0'
           host: 'windows'
           target: 'desktop'
           arch: 'win64_msvc2019_64'

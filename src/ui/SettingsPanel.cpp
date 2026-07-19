@@ -12,6 +12,7 @@
 #include <QGroupBox>
 #include <QScrollArea>
 #include <QPushButton>
+#include <QMessageBox>
 #include <QSettings>
 #include <QComboBox>
 #include <QFrame>
@@ -44,9 +45,7 @@ void SettingsPanel::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing, true);
     QColor bg = ThemeManager::instance()->backgroundColor();
     painter.setBrush(QBrush(bg));
-    QPen borderPen(ThemeManager::instance()->borderColor());
-    borderPen.setWidth(1);
-    painter.setPen(borderPen);
+    painter.setPen(Qt::NoPen);
     painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), 
                             DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
 }
@@ -151,6 +150,30 @@ void SettingsPanel::setupUI()
     QWidget* aboutPage = new QWidget();
     setupAboutPage(aboutPage);
     m_contentStack->addWidget(aboutPage);
+
+    QWidget* buttonBar = new QWidget(this);
+    buttonBar->setFixedHeight(DPIAdapter::scaledSize(44));
+    QHBoxLayout* btnLayout = new QHBoxLayout(buttonBar);
+    btnLayout->setContentsMargins(DPIAdapter::scaledSize(16), 0, DPIAdapter::scaledSize(16), 0);
+    btnLayout->setSpacing(DPIAdapter::scaledSize(12));
+
+    QPushButton* saveBtn = new QPushButton("保存", buttonBar);
+    saveBtn->setFixedHeight(DPIAdapter::scaledSize(28));
+    saveBtn->setStyleSheet(QString(
+        "QPushButton { background-color: %1; color: white; border: none; border-radius: 4px; padding: 0 %2px; }"
+        "QPushButton:hover { background-color: %3; }"
+        "QPushButton:pressed { background-color: %4; }"
+    ).arg(
+        ThemeManager::instance()->primaryColor(),
+        QString::number(DPIAdapter::scaledSize(16)),
+        ThemeManager::instance()->primaryColor(),
+        "#00A080"
+    ));
+    connect(saveBtn, &QPushButton::clicked, this, &SettingsPanel::saveSettings);
+    btnLayout->addStretch();
+    btnLayout->addWidget(saveBtn);
+
+    mainLayout->addWidget(buttonBar);
 
     connect(m_navList, &QListWidget::currentRowChanged, m_contentStack, &QStackedWidget::setCurrentIndex);
 
@@ -607,6 +630,42 @@ void SettingsPanel::refreshFileAssocPage()
     foreach (QCheckBox* cb, m_imageCheckboxes) {
         QString fmt = cb->property("format").toString();
         cb->setChecked(fa->imageFormats().contains(fmt));
+    }
+}
+
+void SettingsPanel::saveSettings()
+{
+    QStringList newVideo, newAudio, newImage;
+    foreach (QCheckBox* cb, m_videoCheckboxes) {
+        if (cb->isChecked()) {
+            newVideo.append(cb->property("format").toString());
+        }
+    }
+    foreach (QCheckBox* cb, m_audioCheckboxes) {
+        if (cb->isChecked()) {
+            newAudio.append(cb->property("format").toString());
+        }
+    }
+    foreach (QCheckBox* cb, m_imageCheckboxes) {
+        if (cb->isChecked()) {
+            newImage.append(cb->property("format").toString());
+        }
+    }
+
+    FileAssociation* fa = FileAssociation::instance();
+    bool changed = false;
+    if (fa->videoFormats() != newVideo || fa->audioFormats() != newAudio || fa->imageFormats() != newImage) {
+        changed = true;
+        fa->setVideoFormats(newVideo);
+        fa->setAudioFormats(newAudio);
+        fa->setImageFormats(newImage);
+        fa->registerAssociations();
+    }
+
+    if (changed) {
+        QMessageBox::information(this, "设置已保存", "文件关联已更新，可能需要重启系统才能完全生效。");
+    } else {
+        close();
     }
 }
 

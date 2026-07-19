@@ -96,8 +96,7 @@ void MainWindow::setupUI()
     setCentralWidget(centralWidget);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(centralWidget);
-    mainLayout->setContentsMargins(DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8), 
-                                   DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
     m_headerBar = new HeaderBar(this);
@@ -312,6 +311,8 @@ void MainWindow::openFileDialog()
 
 void MainWindow::openFile(const QString& filePath)
 {
+    m_playerController->stop();
+
     MediaType type = FileSignatureDetector::detectMediaType(filePath);
 
     if (type == MediaType::Unknown) {
@@ -635,10 +636,7 @@ void MainWindow::paintEvent(QPaintEvent* event)
         painter.setPen(Qt::NoPen);
         painter.drawRect(rect());
     } else {
-        QColor borderColor = ThemeManager::instance()->borderColor();
-        QPen borderPen(borderColor);
-        borderPen.setWidth(1);
-        painter.setPen(borderPen);
+        painter.setPen(Qt::NoPen);
         painter.drawRoundedRect(rect().adjusted(0, 0, -1, -1), DPIAdapter::scaledSize(8), DPIAdapter::scaledSize(8));
     }
 }

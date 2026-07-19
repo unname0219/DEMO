@@ -40,6 +40,7 @@ private:
     void setupAboutPage(QWidget* page);
     void refreshFileAssocPage();
     void updateNavListStyle();
+    void saveSettings();
 
     QTabWidget* m_tabWidget;
     QListWidget* m_navList;
