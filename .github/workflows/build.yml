@@ -69,15 +69,30 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $FFMPEG_VERSION = "7.0.2"
-          $FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.0-latest-win64-gpl-7.0.zip"
-          Write-Host "Downloading FFmpeg..."
+          Write-Host "Downloading FFmpeg MSVC prebuilt from System233..."
+          $FFMPEG_URL = "https://github.com/System233/ffmpeg-msvc-prebuilt/releases/download/ffmpeg-7.1.5/ffmpeg-7.1.5_x64-windows-shared-gpl.zip"
           Invoke-WebRequest -Uri $FFMPEG_URL -OutFile "ffmpeg.zip" -UseBasicParsing
           Write-Host "Extracting FFmpeg..."
-          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "." -Force
-          $ffmpegDir = Get-ChildItem -Directory -Filter "ffmpeg-*" | Select-Object -First 1 -ExpandProperty FullName
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg" -Force
+          # 查找解压后的目录结构
+          $ffmpegDir = Get-ChildItem -Directory -Path "ffmpeg" | Select-Object -First 1 -ExpandProperty FullName
+          # System233的构建结构: ffmpeg/include, ffmpeg/lib, ffmpeg/bin
+          # 如果有多层目录，进入第一层
+          if (-not (Test-Path "$ffmpegDir\include")) {
+            $ffmpegDir = Get-ChildItem -Directory -Path $ffmpegDir | Select-Object -First 1 -ExpandProperty FullName
+          }
           echo "FFMPEG_DIR=$ffmpegDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Host "FFmpeg installed at: $ffmpegDir"
+          Write-Host "Directory structure:"
+          Get-ChildItem $ffmpegDir | Format-Table Name, Mode -AutoSize
+          if (Test-Path "$ffmpegDir\lib") {
+            Write-Host "Lib files:"
+            Get-ChildItem "$ffmpegDir\lib" | Format-Table Name -AutoSize
+          }
+          if (Test-Path "$ffmpegDir\bin") {
+            Write-Host "Dll files:"
+            Get-ChildItem "$ffmpegDir\bin" -Filter "*.dll" | Format-Table Name -AutoSize
+          }
 
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
@@ -104,7 +119,6 @@ jobs:
           cd build
           $ffmpegDir = $env:FFMPEG_DIR
           cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release `
-            -DFFMPEG_ROOT="$ffmpegDir" `
             -DAVCODEC_INCLUDE_DIR="$ffmpegDir/include" `
             -DAVCODEC_LIBRARY="$ffmpegDir/lib/avcodec.lib" `
             -DAVFORMAT_INCLUDE_DIR="$ffmpegDir/include" `
@@ -151,7 +165,8 @@ jobs:
         run: |
           cd build\bin\Release
           windeployqt FireflyPlayer.exe --no-translations --no-system-d3d-compiler --no-opengl-sw --release
-          copy /Y %FFMPEG_DIR%\bin\*.dll .
+          echo Copying FFmpeg DLLs from %FFMPEG_DIR%\bin...
+          copy /Y "%FFMPEG_DIR%\bin\*.dll" .
           dir
 
       - name: Create archive (Windows)

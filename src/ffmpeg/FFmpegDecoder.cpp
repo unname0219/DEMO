@@ -103,11 +103,22 @@ bool FFmpegDecoder::open(const QString& filePath, DecodeMode mode)
         } else {
             m_swrCtx = swr_alloc();
             if (m_swrCtx) {
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 24, 100)
+                // FFmpeg 5.1+ 新 API
                 AVChannelLayout outChLayout = AV_CHANNEL_LAYOUT_STEREO;
                 swr_alloc_set_opts2(&m_swrCtx,
                     &outChLayout, AV_SAMPLE_FMT_S16, 48000,
                     &m_audioCodecCtx->ch_layout, m_audioCodecCtx->sample_fmt, m_audioCodecCtx->sample_rate,
                     0, nullptr);
+#else
+                // FFmpeg 旧 API
+                av_opt_set_int(m_swrCtx, "in_channel_layout", m_audioCodecCtx->channel_layout ? m_audioCodecCtx->channel_layout : AV_CH_LAYOUT_STEREO, 0);
+                av_opt_set_int(m_swrCtx, "in_sample_rate", m_audioCodecCtx->sample_rate, 0);
+                av_opt_set_sample_fmt(m_swrCtx, "in_sample_fmt", m_audioCodecCtx->sample_fmt, 0);
+                av_opt_set_int(m_swrCtx, "out_channel_layout", AV_CH_LAYOUT_STEREO, 0);
+                av_opt_set_int(m_swrCtx, "out_sample_rate", 48000, 0);
+                av_opt_set_sample_fmt(m_swrCtx, "out_sample_fmt", AV_SAMPLE_FMT_S16, 0);
+#endif
                 swr_init(m_swrCtx);
 
                 m_audioFormat.setSampleRate(48000);
