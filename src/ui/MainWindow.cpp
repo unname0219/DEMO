@@ -54,6 +54,7 @@ MainWindow::MainWindow(QWidget* parent)
     , m_controlBarAnimation(nullptr)
     , m_progressBarAnimation(nullptr)
     , m_isFullScreen(false)
+    , m_wasMaximizedBeforeFullScreen(false)
 {
     m_playerController = new PlayerController(this);
     m_hideControlsTimer = new QTimer(this);
@@ -374,7 +375,10 @@ void MainWindow::repositionSettingsPanel()
 void MainWindow::toggleFullScreen()
 {
     if (m_isFullScreen) {
+        // 退出全屏，恢复到之前的窗口状态
         m_mouseCheckTimer->stop();
+        
+        // 先设置为普通状态，再根据之前的状态决定是否最大化
         showNormal();
         setContentsMargins(0, 0, 0, 0);
         m_headerBar->show();
@@ -394,8 +398,17 @@ void MainWindow::toggleFullScreen()
         }
 
         m_isFullScreen = false;
+        
+        // 恢复之前的最大化状态
+        if (m_wasMaximizedBeforeFullScreen) {
+            showMaximized();
+        }
+        
         update();
     } else {
+        // 进入全屏，保存当前的最大化状态
+        m_wasMaximizedBeforeFullScreen = isMaximized();
+        
         setContentsMargins(0, 0, 0, 0);
         showFullScreen();
         m_headerBar->hide();

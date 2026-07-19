@@ -79,6 +79,7 @@ private:
 
     QString m_currentFile;
     bool m_isFullScreen;
+    bool m_wasMaximizedBeforeFullScreen;
 };
 
 #endif

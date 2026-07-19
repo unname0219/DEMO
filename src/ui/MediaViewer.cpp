@@ -27,7 +27,7 @@ MediaViewer::~MediaViewer()
 void MediaViewer::setupUI()
 {
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setContentsMargins(0, 0, 1, 0);
 
     m_stackedLayout = new QStackedLayout();
     mainLayout->addLayout(m_stackedLayout);
