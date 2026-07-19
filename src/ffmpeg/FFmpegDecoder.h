@@ -132,6 +132,11 @@ private:
     std::thread m_decodeThread;
 
     DecodeMode m_decodeMode;
+
+    // 预分配的视频转换缓冲区，避免每帧分配
+    uint8_t* m_rgbBuffer;
+    int m_rgbBufferSize;
+    int m_rgbLinesize;
 };
 
 #endif

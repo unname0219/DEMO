@@ -35,9 +35,6 @@ void VideoPlayer::setupUI()
     m_videoWidget->setStyleSheet("background-color: #1a1a1a;");
     m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     m_videoWidget->setMouseTracking(true);
-    // 关键：让QVideoWidget不使用原生窗口，避免在全屏下盖住浮动控件
-    m_videoWidget->setAttribute(Qt::WA_DontCreateNativeAncestors);
-    m_videoWidget->setAttribute(Qt::WA_NativeWindow, false);
     m_stackedLayout->addWidget(m_videoWidget);
 
 #ifdef FFMPEG_ENABLED

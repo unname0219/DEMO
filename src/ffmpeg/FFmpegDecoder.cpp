@@ -26,6 +26,9 @@ FFmpegDecoder::FFmpegDecoder(QObject* parent)
     , m_fps(0.0)
     , m_playbackSpeed(1.0)
     , m_decodeMode(SoftwareDecode)
+    , m_rgbBuffer(nullptr)
+    , m_rgbBufferSize(0)
+    , m_rgbLinesize(0)
 {
 }
 
@@ -33,6 +36,12 @@ FFmpegDecoder::~FFmpegDecoder()
 {
     stop();
     close();
+
+    if (m_rgbBuffer) {
+        av_free(m_rgbBuffer);
+        m_rgbBuffer = nullptr;
+        m_rgbBufferSize = 0;
+    }
 }
 
 bool FFmpegDecoder::open(const QString& filePath, DecodeMode mode)
@@ -92,6 +101,12 @@ bool FFmpegDecoder::open(const QString& filePath, DecodeMode mode)
                 m_videoWidth, m_videoHeight, AV_PIX_FMT_RGB24,
                 SWS_BILINEAR, nullptr, nullptr, nullptr
             );
+
+            // 预分配 RGB 缓冲区，避免每帧都 av_frame_alloc + av_frame_get_buffer
+            m_rgbLinesize = m_videoWidth * 3;
+            m_rgbLinesize = (m_rgbLinesize + 31) & ~31; // 对齐到32字节
+            m_rgbBufferSize = m_rgbLinesize * m_videoHeight;
+            m_rgbBuffer = (uint8_t*)av_malloc(m_rgbBufferSize);
         }
     }
 
@@ -204,6 +219,12 @@ void FFmpegDecoder::close()
 
     if (m_decodeThread.joinable()) {
         m_decodeThread.join();
+    }
+
+    if (m_rgbBuffer) {
+        av_free(m_rgbBuffer);
+        m_rgbBuffer = nullptr;
+        m_rgbBufferSize = 0;
     }
 
     if (m_swsCtx) {
@@ -519,26 +540,23 @@ bool FFmpegDecoder::decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFram
         }
 
         if (isVideo) {
-            AVFrame* rgbFrame = av_frame_alloc();
-            rgbFrame->format = AV_PIX_FMT_RGB24;
-            rgbFrame->width = m_videoWidth;
-            rgbFrame->height = m_videoHeight;
-            av_frame_get_buffer(rgbFrame, 32);
+            // 使用预分配的 RGB 缓冲区，避免每帧 av_frame_alloc/get_buffer
+            if (m_rgbBuffer && m_swsCtx) {
+                uint8_t* dst[1] = { m_rgbBuffer };
+                int dstLinesize[1] = { m_rgbLinesize };
 
-            if (m_swsCtx) {
                 sws_scale(m_swsCtx, frame->data, frame->linesize, 0,
-                          m_videoHeight, rgbFrame->data, rgbFrame->linesize);
+                          m_videoHeight, dst, dstLinesize);
+
+                // QImage 直接引用缓冲区，copy 时一次性拷贝
+                QImage img(m_rgbBuffer, m_videoWidth, m_videoHeight,
+                           m_rgbLinesize, QImage::Format_RGB888);
+
+                VideoFrame vf;
+                vf.image = img.copy();
+                vf.pts = framePts;
+                videoQueue.enqueue(vf);
             }
-
-            QImage img(rgbFrame->data[0], m_videoWidth, m_videoHeight,
-                       rgbFrame->linesize[0], QImage::Format_RGB888);
-
-            VideoFrame vf;
-            vf.image = img.copy();
-            vf.pts = framePts;
-
-            videoQueue.enqueue(vf);
-            av_frame_free(&rgbFrame);
         } else {
             if (m_swrCtx) {
                 uint8_t* outBuffer = nullptr;

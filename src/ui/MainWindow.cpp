@@ -377,13 +377,19 @@ void MainWindow::toggleFullScreen()
     if (m_isFullScreen) {
         // 退出全屏，恢复到之前的窗口状态
         m_mouseCheckTimer->stop();
-        
+
+        // 隐藏浮动控件窗口
+        m_controlBar->hide();
+        m_controlBar->setParent(centralWidget());
+        m_controlBar->setWindowFlags(Qt::Widget);
+        m_progressBar->hide();
+        m_progressBar->setParent(centralWidget());
+        m_progressBar->setWindowFlags(Qt::Widget);
+
         // 先设置为普通状态，再根据之前的状态决定是否最大化
         showNormal();
         setContentsMargins(0, 0, 0, 0);
         m_headerBar->show();
-        m_progressBar->show();
-        m_controlBar->show();
         m_controlBar->setStyleSheet("");
         m_progressBar->setStyleSheet("");
 
@@ -397,23 +403,26 @@ void MainWindow::toggleFullScreen()
             mainLayout->insertWidget(3, m_controlBar);
         }
 
+        m_progressBar->show();
+        m_controlBar->show();
+
         m_isFullScreen = false;
-        
+
         // 恢复之前的最大化状态
         if (m_wasMaximizedBeforeFullScreen) {
             showMaximized();
         }
-        
+
         update();
     } else {
         // 进入全屏，保存当前的最大化状态
         m_wasMaximizedBeforeFullScreen = isMaximized();
-        
+
         setContentsMargins(0, 0, 0, 0);
         showFullScreen();
         m_headerBar->hide();
 
-        // 从布局中移除控件，改为绝对定位浮动
+        // 从布局中移除控件
         QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(centralWidget()->layout());
         if (mainLayout) {
             mainLayout->removeWidget(m_mediaViewer);
@@ -424,39 +433,42 @@ void MainWindow::toggleFullScreen()
         int w = width();
         int h = height();
         int ctrlH = DPIAdapter::scaledSize(52);
-        int progH = m_progressBar->height();
+        int progH = DPIAdapter::scaledSize(4);
 
-        // 视频放最底层，充满整个窗口
+        // 视频充满整个窗口
         m_mediaViewer->setParent(centralWidget());
         m_mediaViewer->setGeometry(0, 0, w, h);
-        m_mediaViewer->lower();
         m_mediaViewer->show();
 
-        // 进度条浮在上面（强制原生窗口，确保能盖住QVideoWidget的原生渲染层）
-        m_progressBar->setParent(centralWidget());
-        m_progressBar->setAttribute(Qt::WA_NativeWindow, true);
-        m_progressBar->setGeometry(0, h - ctrlH - progH, w, progH);
-        m_progressBar->setVisible(true);
-        m_progressBar->raise();
+        // 控制栏和进度条改为独立顶层窗口（悬浮在主窗口之上）
+        // 这样不会被 QVideoWidget 的原生渲染层遮挡
+        QPoint topLeft = mapToGlobal(QPoint(0, h - ctrlH - progH));
+        QPoint ctrlTopLeft = mapToGlobal(QPoint(0, h - ctrlH));
 
-        // 控制栏浮在上面（强制原生窗口）
-        m_controlBar->setParent(centralWidget());
-        m_controlBar->setAttribute(Qt::WA_NativeWindow, true);
-        m_controlBar->setGeometry(0, h - ctrlH, w, ctrlH);
+        m_progressBar->setParent(nullptr);
+        m_progressBar->setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
+        m_progressBar->setGeometry(topLeft.x(), topLeft.y(), w, progH);
+        m_progressBar->setStyleSheet(
+            "background-color: rgba(0,0,0,180);"
+        );
+        m_progressBar->show();
+
+        m_controlBar->setParent(nullptr);
+        m_controlBar->setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
+        m_controlBar->setGeometry(ctrlTopLeft.x(), ctrlTopLeft.y(), w, ctrlH);
         m_controlBar->setObjectName("controlBar");
         m_controlBar->setStyleSheet(
             "#controlBar { background-color: rgba(0,0,0,180); }"
             "#controlBar QPushButton { background-color: transparent; }"
             "#controlBar QLabel { color: white; }"
         );
-        m_controlBar->setVisible(true);
-        m_controlBar->raise();
+        m_controlBar->show();
 
         m_isFullScreen = true;
-        
-        // 启动鼠标位置检查定时器（解决QVideoWidget原生窗口不传递事件的问题）
+
+        // 启动鼠标位置检查定时器
         m_mouseCheckTimer->start();
-        
+
         showControls();
         update();
     }
@@ -468,8 +480,13 @@ void MainWindow::showControls()
     m_hideControlsTimer->stop();
 
     int ctrlH = DPIAdapter::scaledSize(52);
-    int progH = DPIAdapter::scaledSize(20);
+    int progH = DPIAdapter::scaledSize(4);
     int h = height();
+
+    // 顶层窗口用全局坐标
+    QPoint baseGlobal = mapToGlobal(QPoint(0, 0));
+    int gx = baseGlobal.x();
+    int gy = baseGlobal.y();
 
     m_progressBar->show();
     m_progressBar->raise();
@@ -479,13 +496,13 @@ void MainWindow::showControls()
     m_progressBarAnimation->setTargetObject(m_progressBar);
     m_progressBarAnimation->setPropertyName("pos");
     m_progressBarAnimation->setStartValue(m_progressBar->pos());
-    m_progressBarAnimation->setEndValue(QPoint(0, h - ctrlH - progH));
+    m_progressBarAnimation->setEndValue(QPoint(gx, gy + h - ctrlH - progH));
     m_progressBarAnimation->start();
 
     m_controlBarAnimation->setTargetObject(m_controlBar);
     m_controlBarAnimation->setPropertyName("pos");
     m_controlBarAnimation->setStartValue(m_controlBar->pos());
-    m_controlBarAnimation->setEndValue(QPoint(0, h - ctrlH));
+    m_controlBarAnimation->setEndValue(QPoint(gx, gy + h - ctrlH));
     m_controlBarAnimation->start();
 
     QTimer::singleShot(350, this, [this]() {
@@ -503,17 +520,19 @@ void MainWindow::hideControls()
     if (!m_isFullScreen) return;
 
     int h = height();
+    QPoint baseGlobal = mapToGlobal(QPoint(0, 0));
+    int gy = baseGlobal.y();
 
-    // 动画：进度条向下滑出
-    QPoint progTarget(0, h);
+    // 动画：进度条向下滑出屏幕
+    QPoint progTarget(baseGlobal.x(), gy + h);
     m_progressBarAnimation->setTargetObject(m_progressBar);
     m_progressBarAnimation->setPropertyName("pos");
     m_progressBarAnimation->setStartValue(m_progressBar->pos());
     m_progressBarAnimation->setEndValue(progTarget);
     m_progressBarAnimation->start();
 
-    // 动画：控制栏向下滑出
-    QPoint ctrlTarget(0, h);
+    // 动画：控制栏向下滑出屏幕
+    QPoint ctrlTarget(baseGlobal.x(), gy + h);
     m_controlBarAnimation->setTargetObject(m_controlBar);
     m_controlBarAnimation->setPropertyName("pos");
     m_controlBarAnimation->setStartValue(m_controlBar->pos());
