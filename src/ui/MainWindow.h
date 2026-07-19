@@ -45,6 +45,7 @@ private slots:
     void onVolumeBoostRequested();
     void playAdjacentFile(int direction);
     void hideControlsAfterTimeout();
+    void checkMousePosition();
 
 private:
     void setupUI();
@@ -72,6 +73,7 @@ private:
 
     QWidget* m_controlBar;
     QTimer* m_hideControlsTimer;
+    QTimer* m_mouseCheckTimer;
     QPropertyAnimation* m_controlBarAnimation;
     QPropertyAnimation* m_progressBarAnimation;
 

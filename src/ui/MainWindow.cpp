@@ -50,15 +50,20 @@ MainWindow::MainWindow(QWidget* parent)
     , m_playerController(nullptr)
     , m_controlBar(nullptr)
     , m_hideControlsTimer(nullptr)
+    , m_mouseCheckTimer(nullptr)
     , m_controlBarAnimation(nullptr)
     , m_progressBarAnimation(nullptr)
     , m_isFullScreen(false)
 {
     m_playerController = new PlayerController(this);
     m_hideControlsTimer = new QTimer(this);
-    m_hideControlsTimer->setInterval(1000);
+    m_hideControlsTimer->setInterval(3000);
     m_hideControlsTimer->setSingleShot(true);
     connect(m_hideControlsTimer, &QTimer::timeout, this, &MainWindow::hideControlsAfterTimeout);
+
+    m_mouseCheckTimer = new QTimer(this);
+    m_mouseCheckTimer->setInterval(100);
+    connect(m_mouseCheckTimer, &QTimer::timeout, this, &MainWindow::checkMousePosition);
 
     m_controlBarAnimation = new QPropertyAnimation(this);
     m_controlBarAnimation->setDuration(300);
@@ -369,6 +374,7 @@ void MainWindow::repositionSettingsPanel()
 void MainWindow::toggleFullScreen()
 {
     if (m_isFullScreen) {
+        m_mouseCheckTimer->stop();
         showNormal();
         setContentsMargins(0, 0, 0, 0);
         m_headerBar->show();
@@ -433,20 +439,8 @@ void MainWindow::toggleFullScreen()
 
         m_isFullScreen = true;
         
-        // 确保视频窗口开启mouseTracking并安装事件过滤器
-        if (m_mediaViewer->videoWidget()) {
-            m_mediaViewer->videoWidget()->setMouseTracking(true);
-            m_mediaViewer->videoWidget()->installEventFilter(this);
-        }
-        if (m_mediaViewer->imageViewer()) {
-            m_mediaViewer->imageViewer()->installEventFilter(this);
-        }
-        if (m_mediaViewer->audioPlayer()) {
-            m_mediaViewer->audioPlayer()->installEventFilter(this);
-        }
-        
-        // 安装事件过滤器到所有子控件
-        m_mediaViewer->installEventFilter(this);
+        // 启动鼠标位置检查定时器（解决QVideoWidget原生窗口不传递事件的问题）
+        m_mouseCheckTimer->start();
         
         showControls();
         update();
@@ -515,6 +509,27 @@ void MainWindow::hideControls()
 void MainWindow::hideControlsAfterTimeout()
 {
     hideControls();
+}
+
+void MainWindow::checkMousePosition()
+{
+    if (!m_isFullScreen) return;
+    
+    QPoint globalPos = QCursor::pos();
+    QPoint localPos = mapFromGlobal(globalPos);
+    
+    // 检查鼠标是否在窗口内
+    if (!rect().contains(localPos)) return;
+    
+    int h = height();
+    int ctrlH = m_controlBar ? m_controlBar->height() : DPIAdapter::scaledSize(52);
+    int progH = m_progressBar ? m_progressBar->height() : DPIAdapter::scaledSize(20);
+    int triggerHeight = ctrlH + progH + DPIAdapter::scaledSize(40);
+    
+    // 如果鼠标在底部区域，显示控件
+    if (localPos.y() >= h - triggerHeight) {
+        showControls();
+    }
 }
 
 void MainWindow::onVolumeBoostRequested()

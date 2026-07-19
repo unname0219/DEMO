@@ -2,6 +2,7 @@
 #include "core/PlayerController.h"
 #include "managers/ThemeManager.h"
 #include "managers/DPIAdapter.h"
+#include "managers/IconManager.h"
 #include <QPainter>
 #include <QPixmap>
 #include <QPainterPath>
@@ -36,6 +37,8 @@ void AudioPlayer::setupUI()
 
     showDefaultCover();
     setMinimumSize(DPIAdapter::scaledSize(300), DPIAdapter::scaledSize(300));
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, &AudioPlayer::showDefaultCover);
 }
 
 int AudioPlayer::discSize() const
@@ -56,36 +59,22 @@ void AudioPlayer::showDefaultCover()
 
     QRectF discRect(0, 0, size, size);
 
+    // 绘制圆形背景
+    QString primary = ThemeManager::instance()->primaryColor();
     QRadialGradient gradient(discRect.center(), size / 2.0);
-    gradient.setColorAt(0.0, QColor(40, 40, 40));
-    gradient.setColorAt(0.7, QColor(25, 25, 25));
-    gradient.setColorAt(0.85, QColor(15, 15, 15));
-    gradient.setColorAt(1.0, QColor(5, 5, 5));
+    gradient.setColorAt(0.0, QColor(primary).lighter(130));
+    gradient.setColorAt(0.7, QColor(primary).lighter(110));
+    gradient.setColorAt(1.0, QColor(primary).darker(120));
     painter.setBrush(gradient);
     painter.setPen(Qt::NoPen);
     painter.drawEllipse(discRect);
 
-    painter.setPen(QColor(60, 60, 60, 80));
-    for (int i = 0; i < 15; i++) {
-        qreal ratio = 0.3 + i * 0.04;
-        if (ratio > 0.85) break;
-        qreal r = size / 2.0 * ratio;
-        painter.drawEllipse(discRect.center(), r, r);
-    }
-
-    qreal labelSize = size * 0.35;
-    QRectF labelRect((size - labelSize) / 2.0, (size - labelSize) / 2.0, labelSize, labelSize);
-    QRadialGradient labelGrad(labelRect.center(), labelSize / 2.0);
-    labelGrad.setColorAt(0.0, QColor(0, 212, 170));
-    labelGrad.setColorAt(1.0, QColor(0, 160, 130));
-    painter.setBrush(labelGrad);
-    painter.setPen(Qt::NoPen);
-    painter.drawEllipse(labelRect);
-
-    qreal holeSize = size * 0.06;
-    QRectF holeRect((size - holeSize) / 2.0, (size - holeSize) / 2.0, holeSize, holeSize);
-    painter.setBrush(QColor(20, 20, 20));
-    painter.drawEllipse(holeRect);
+    // 绘制音符图标
+    QIcon musicIcon = IconManager::instance()->coloredIcon("music", QColor(255, 255, 255));
+    int iconSize = size * 0.45;
+    QPixmap iconPixmap = musicIcon.pixmap(iconSize, iconSize);
+    QPointF iconPos((size - iconSize) / 2.0, (size - iconSize) / 2.0);
+    painter.drawPixmap(iconPos, iconPixmap);
 
     m_defaultCover = disc;
     update();

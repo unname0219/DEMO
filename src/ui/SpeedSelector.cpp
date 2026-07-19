@@ -25,17 +25,7 @@ void SpeedSelector::setupUI()
     m_comboBox = new QComboBox(this);
     m_comboBox->setFixedHeight(DPIAdapter::scaledSize(32));
     m_comboBox->setMinimumWidth(DPIAdapter::scaledSize(80));
-    QString bg = ThemeManager::instance()->backgroundColor();
-    QString text = ThemeManager::instance()->textColor();
-    QString border = ThemeManager::instance()->borderColor();
-    QString hover = ThemeManager::instance()->hoverColor();
-    m_comboBox->setStyleSheet(
-        QString("QComboBox { border: none; background: %1; color: %2; padding: 0 8px; }"
-                "QComboBox::drop-down { border: none; }"
-                "QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid %2; }"
-                "QComboBox QAbstractItemView { background: %1; color: %2; border: 1px solid %3; selection-background-color: %4; }")
-        .arg(bg).arg(text).arg(border).arg(hover)
-    );
+    updateStyle();
 
     QList<double> speeds = FormatUtils::availableSpeeds();
     for (double speed : speeds) {
@@ -49,8 +39,26 @@ void SpeedSelector::setupUI()
 
     connect(m_comboBox, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SpeedSelector::onCurrentIndexChanged);
+    connect(ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, &SpeedSelector::updateStyle);
 
     layout->addWidget(m_comboBox);
+}
+
+void SpeedSelector::updateStyle()
+{
+    QString bg = ThemeManager::instance()->backgroundColor();
+    QString text = ThemeManager::instance()->textColor();
+    QString border = ThemeManager::instance()->borderColor();
+    QString hover = ThemeManager::instance()->hoverColor();
+    m_comboBox->setStyleSheet(
+        QString("QComboBox { border: none; background: %1; color: %2; padding: 0 8px; border-radius: 4px; }"
+                "QComboBox:hover { background: %4; }"
+                "QComboBox::drop-down { border: none; }"
+                "QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid %2; }"
+                "QComboBox QAbstractItemView { background: %1; color: %2; border: 1px solid %3; selection-background-color: %4; outline: none; }")
+        .arg(bg).arg(text).arg(border).arg(hover)
+    );
 }
 
 void SpeedSelector::onCurrentIndexChanged(int index)

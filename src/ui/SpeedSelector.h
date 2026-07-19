@@ -20,6 +20,7 @@ public slots:
 
 private slots:
     void onCurrentIndexChanged(int index);
+    void updateStyle();
 
 private:
     void setupUI();
