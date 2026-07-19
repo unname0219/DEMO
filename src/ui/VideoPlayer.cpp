@@ -25,6 +25,7 @@ void VideoPlayer::setupUI()
     m_videoWidget = new QVideoWidget(this);
     m_videoWidget->setStyleSheet("background-color: #1a1a1a;");
     m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_videoWidget->setMouseTracking(true);
     layout->addWidget(m_videoWidget);
 }
 

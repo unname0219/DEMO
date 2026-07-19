@@ -92,6 +92,12 @@ void ImageViewer::setupToolbar()
     m_zoomSlider->setRange(10, 200);
     m_zoomSlider->setValue(100);
     m_zoomSlider->setFixedWidth(DPIAdapter::scaledSize(150));
+    m_zoomSlider->setStyleSheet(
+        "QSlider { border: none; background: transparent; }"
+        "QSlider::groove:horizontal { height: 4px; background: rgba(255,255,255,40); border-radius: 2px; }"
+        "QSlider::handle:horizontal { width: 14px; background: #7fea94; border-radius: 7px; margin: -5px 0; border: none; }"
+        "QSlider::sub-page:horizontal { background: #7fea94; border-radius: 2px; }"
+    );
     connect(m_zoomSlider, &QSlider::valueChanged, this, &ImageViewer::onZoomSliderChanged);
     toolbarLayout->addWidget(m_zoomSlider);
 

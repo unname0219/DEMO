@@ -405,7 +405,7 @@ void MainWindow::toggleFullScreen()
         int w = width();
         int h = height();
         int ctrlH = DPIAdapter::scaledSize(52);
-        int progH = DPIAdapter::scaledSize(20);
+        int progH = m_progressBar->height();
 
         // 视频放最底层，充满整个窗口
         m_mediaViewer->setParent(centralWidget());
@@ -432,7 +432,10 @@ void MainWindow::toggleFullScreen()
         m_controlBar->raise();
 
         m_isFullScreen = true;
+        
+        // 确保视频窗口开启mouseTracking并安装事件过滤器
         if (m_mediaViewer->videoWidget()) {
+            m_mediaViewer->videoWidget()->setMouseTracking(true);
             m_mediaViewer->videoWidget()->installEventFilter(this);
         }
         if (m_mediaViewer->imageViewer()) {
@@ -441,6 +444,10 @@ void MainWindow::toggleFullScreen()
         if (m_mediaViewer->audioPlayer()) {
             m_mediaViewer->audioPlayer()->installEventFilter(this);
         }
+        
+        // 安装事件过滤器到所有子控件
+        m_mediaViewer->installEventFilter(this);
+        
         showControls();
         update();
     }
@@ -683,7 +690,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
     }
     if (event->type() == QEvent::MouseMove && m_isFullScreen) {
         showControls();
-        return false;
+        return true;
     }
     if (event->type() == QEvent::MouseButtonPress && !isMaximized() && !m_isFullScreen) {
         QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
@@ -706,6 +713,10 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
                 }
             }
         }
+    }
+    if (event->type() == QEvent::MouseButtonPress && m_isFullScreen) {
+        showControls();
+        return true;
     }
     return QMainWindow::eventFilter(obj, event);
 }

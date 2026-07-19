@@ -1,5 +1,6 @@
 #include "ui/SpeedSelector.h"
 #include "managers/DPIAdapter.h"
+#include "managers/ThemeManager.h"
 #include "utils/FormatUtils.h"
 #include <QHBoxLayout>
 
@@ -23,11 +24,17 @@ void SpeedSelector::setupUI()
 
     m_comboBox = new QComboBox(this);
     m_comboBox->setFixedHeight(DPIAdapter::scaledSize(32));
-    m_comboBox->setMinimumWidth(DPIAdapter::scaledSize(60));
+    m_comboBox->setMinimumWidth(DPIAdapter::scaledSize(80));
+    QString bg = ThemeManager::instance()->backgroundColor();
+    QString text = ThemeManager::instance()->textColor();
+    QString border = ThemeManager::instance()->borderColor();
+    QString hover = ThemeManager::instance()->hoverColor();
     m_comboBox->setStyleSheet(
-        "QComboBox { border: none; background: transparent; padding: 0 8px; }"
-        "QComboBox::drop-down { border: none; }"
-        "QComboBox::down-arrow { image: none; }"
+        QString("QComboBox { border: none; background: %1; color: %2; padding: 0 8px; }"
+                "QComboBox::drop-down { border: none; }"
+                "QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid %2; }"
+                "QComboBox QAbstractItemView { background: %1; color: %2; border: 1px solid %3; selection-background-color: %4; }")
+        .arg(bg).arg(text).arg(border).arg(hover)
     );
 
     QList<double> speeds = FormatUtils::availableSpeeds();
