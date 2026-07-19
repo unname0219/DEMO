@@ -86,7 +86,7 @@ private:
     bool initHardwareDecoder(AVCodecContext* codecCtx, AVCodecParameters* codecpar);
     bool decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFrame* frame,
                       bool isVideo, QQueue<VideoFrame>& videoQueue,
-                      QQueue<AudioFrame>& audioQueue);
+                      QQueue<AudioFrame>& audioQueue, qint64& outPts);
     void flushDecoder(AVCodecContext* codecCtx, AVFrame* frame, bool isVideo,
                       QQueue<VideoFrame>& videoQueue, QQueue<AudioFrame>& audioQueue);
 

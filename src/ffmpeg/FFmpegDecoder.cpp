@@ -132,11 +132,6 @@ bool FFmpegDecoder::open(const QString& filePath, DecodeMode mode)
         m_durationMs = m_formatCtx->duration / 1000;
     }
 
-    m_decodeThread = new QThread(this);
-    moveToThread(m_decodeThread);
-    connect(m_decodeThread, &QThread::started, this, &FFmpegDecoder::decodeLoop);
-    connect(m_decodeThread, &QThread::finished, m_decodeThread, &QThread::deleteLater);
-
     return true;
 }
 
@@ -261,7 +256,13 @@ void FFmpegDecoder::start()
     m_isPaused = false;
     m_isStopRequested = false;
 
-    if (m_decodeThread && !m_decodeThread->isRunning()) {
+    if (!m_decodeThread) {
+        m_decodeThread = new QThread();
+        moveToThread(m_decodeThread);
+        connect(m_decodeThread, &QThread::started, this, &FFmpegDecoder::decodeLoop);
+        connect(m_decodeThread, &QThread::finished, m_decodeThread, &QThread::deleteLater);
+        m_decodeThread->start();
+    } else if (!m_decodeThread->isRunning()) {
         m_decodeThread->start();
     }
 
@@ -387,10 +388,12 @@ void FFmpegDecoder::decodeLoop()
             break;
         }
 
+        qint64 currentPts = 0;
+
         if (pkt->stream_index == m_videoStreamIndex && m_videoCodecCtx) {
-            decodePacket(pkt, m_videoCodecCtx, videoFrame, true, videoQueue, audioQueue);
+            decodePacket(pkt, m_videoCodecCtx, videoFrame, true, videoQueue, audioQueue, currentPts);
         } else if (pkt->stream_index == m_audioStreamIndex && m_audioCodecCtx) {
-            decodePacket(pkt, m_audioCodecCtx, audioFrame, false, videoQueue, audioQueue);
+            decodePacket(pkt, m_audioCodecCtx, audioFrame, false, videoQueue, audioQueue, currentPts);
         }
 
         av_packet_unref(pkt);
@@ -403,6 +406,13 @@ void FFmpegDecoder::decodeLoop()
         while (!audioQueue.isEmpty() && m_audioQueue.size() < 50) {
             m_audioQueue.enqueue(audioQueue.dequeue());
             emit audioFrameReady();
+        }
+
+        if (currentPts > 0) {
+            m_currentPositionMs = qMin(currentPts, m_durationMs);
+        } else {
+            qint64 elapsed = (av_gettime() - m_startTime) / 1000;
+            m_currentPositionMs = qMin((qint64)(elapsed / m_playbackSpeed), m_durationMs);
         }
         m_mutex.unlock();
 
@@ -425,10 +435,12 @@ void FFmpegDecoder::decodeLoop()
 
 bool FFmpegDecoder::decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFrame* frame,
                                  bool isVideo, QQueue<VideoFrame>& videoQueue,
-                                 QQueue<AudioFrame>& audioQueue)
+                                 QQueue<AudioFrame>& audioQueue, qint64& outPts)
 {
     int ret = avcodec_send_packet(codecCtx, pkt);
     if (ret < 0) return false;
+
+    outPts = 0;
 
     while (ret >= 0) {
         ret = avcodec_receive_frame(codecCtx, frame);
@@ -437,6 +449,13 @@ bool FFmpegDecoder::decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFram
         }
         if (ret < 0) {
             return false;
+        }
+
+        qint64 framePts = 0;
+        if (frame->pts != AV_NOPTS_VALUE) {
+            AVRational tb = codecCtx->pkt_timebase;
+            framePts = (qint64)(frame->pts * av_q2d(tb) * 1000);
+            outPts = framePts;
         }
 
         if (isVideo) {
@@ -456,12 +475,7 @@ bool FFmpegDecoder::decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFram
 
             VideoFrame vf;
             vf.image = img.copy();
-            if (frame->pts != AV_NOPTS_VALUE) {
-                AVRational tb = codecCtx->pkt_timebase;
-                vf.pts = (qint64)(frame->pts * av_q2d(tb) * 1000);
-            } else {
-                vf.pts = 0;
-            }
+            vf.pts = framePts;
 
             videoQueue.enqueue(vf);
             av_frame_free(&rgbFrame);
@@ -477,12 +491,7 @@ bool FFmpegDecoder::decodePacket(AVPacket* pkt, AVCodecContext* codecCtx, AVFram
                 if (converted > 0) {
                     AudioFrame af;
                     af.data = QByteArray((const char*)outBuffer, converted * 2 * 2);
-                    if (frame->pts != AV_NOPTS_VALUE) {
-                        AVRational tb = codecCtx->pkt_timebase;
-                        af.pts = (qint64)(frame->pts * av_q2d(tb) * 1000);
-                    } else {
-                        af.pts = 0;
-                    }
+                    af.pts = framePts;
                     audioQueue.enqueue(af);
                 }
                 av_freep(&outBuffer);

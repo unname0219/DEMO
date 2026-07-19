@@ -20,6 +20,7 @@
 #include <QMouseEvent>
 #include <QListWidget>
 #include <QStackedWidget>
+#include <QTimer>
 
 SettingsPanel::SettingsPanel(QWidget* parent)
     : QDialog(parent)
@@ -700,6 +701,12 @@ void SettingsPanel::showEvent(QShowEvent* event)
 {
     QDialog::showEvent(event);
     refreshFileAssocPage();
+    adjustSize();
+    QTimer::singleShot(100, this, [this]() {
+        layout()->invalidate();
+        adjustSize();
+        updateGeometry();
+    });
 }
 
 void SettingsPanel::refreshFileAssocPage()

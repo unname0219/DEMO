@@ -95,8 +95,6 @@ void FFmpegPlayer::play()
     if (!m_decoder) return;
 
     m_decoder->start();
-    m_decoder->pause();
-    m_decoder->pause();
 
     m_state = PlayingState;
     emit stateChanged(m_state);
