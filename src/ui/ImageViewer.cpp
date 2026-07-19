@@ -145,7 +145,7 @@ void ImageViewer::loadImage(const QString& filePath)
 void ImageViewer::repositionToolbar()
 {
     if (!m_toolbar || m_originalImage.isNull()) return;
-    int toolbarW = DPIAdapter::scaledSize(220);
+    int toolbarW = DPIAdapter::scaledSize(280);
     int toolbarH = DPIAdapter::scaledSize(44);
     int x = (width() - toolbarW) / 2;
     int y = height() - toolbarH - DPIAdapter::scaledSize(16);
@@ -297,7 +297,6 @@ void ImageViewer::zoomOut(const QPoint& mousePos)
     m_scaleFactor = qMax(m_scaleFactor / 1.2, 0.1);
 
     if (m_scaleFactor <= 1.0) {
-        m_scaleFactor = 1.0;
         centerImage();
     } else {
         adjustOffset(mousePos, oldScale);
