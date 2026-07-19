@@ -4,6 +4,7 @@
 #include <QAudioFormat>
 #include <QAudioDevice>
 #include <QMediaDevices>
+#include <thread>
 
 FFmpegPlayer::FFmpegPlayer(QObject* parent)
     : QObject(parent)
@@ -67,6 +68,9 @@ bool FFmpegPlayer::open(const QString& filePath, DecodeMode mode)
     }
 
     initAudioOutput();
+
+    std::thread decodeThread(&FFmpegDecoder::decodeLoop, m_decoder);
+    decodeThread.detach();
 
     return true;
 }

@@ -7,8 +7,8 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QQueue>
-#include <QThread>
 #include <QAudioFormat>
+#include <thread>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -77,10 +77,9 @@ signals:
     void finished();
     void error(const QString& message);
 
-private slots:
+private:
     void decodeLoop();
 
-private:
     bool openCodec(AVCodecParameters* codecpar, AVCodecContext** codecCtx,
                    AVStream* stream, bool isVideo, DecodeMode mode);
     bool initHardwareDecoder(AVCodecContext* codecCtx, AVCodecParameters* codecpar);
@@ -121,10 +120,10 @@ private:
     QQueue<VideoFrame> m_videoQueue;
     QQueue<AudioFrame> m_audioQueue;
 
-    QMutex m_mutex;
+    mutable QMutex m_mutex;
     QWaitCondition m_waitCondition;
 
-    QThread* m_decodeThread;
+    std::thread m_decodeThread;
 
     DecodeMode m_decodeMode;
 };

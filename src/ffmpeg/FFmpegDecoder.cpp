@@ -24,7 +24,6 @@ FFmpegDecoder::FFmpegDecoder(QObject* parent)
     , m_videoHeight(0)
     , m_fps(0.0)
     , m_playbackSpeed(1.0)
-    , m_decodeThread(nullptr)
     , m_decodeMode(SoftwareDecode)
 {
 }
@@ -104,14 +103,12 @@ bool FFmpegDecoder::open(const QString& filePath, DecodeMode mode)
             m_swrCtx = swr_alloc();
             if (m_swrCtx) {
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 24, 100)
-                // FFmpeg 5.1+ 新 API
                 AVChannelLayout outChLayout = AV_CHANNEL_LAYOUT_STEREO;
                 swr_alloc_set_opts2(&m_swrCtx,
                     &outChLayout, AV_SAMPLE_FMT_S16, 48000,
                     &m_audioCodecCtx->ch_layout, m_audioCodecCtx->sample_fmt, m_audioCodecCtx->sample_rate,
                     0, nullptr);
 #else
-                // FFmpeg 旧 API
                 av_opt_set_int(m_swrCtx, "in_channel_layout", m_audioCodecCtx->channel_layout ? m_audioCodecCtx->channel_layout : AV_CH_LAYOUT_STEREO, 0);
                 av_opt_set_int(m_swrCtx, "in_sample_rate", m_audioCodecCtx->sample_rate, 0);
                 av_opt_set_sample_fmt(m_swrCtx, "in_sample_fmt", m_audioCodecCtx->sample_fmt, 0);
@@ -139,7 +136,7 @@ bool FFmpegDecoder::openCodec(AVCodecParameters* codecpar, AVCodecContext** code
                               AVStream* stream, bool isVideo, DecodeMode mode)
 {
     const AVCodec* codec = nullptr;
-    
+
     if (isVideo && mode == HardwareDecode) {
         static const char* hwDecoders[] = {
             "h264_qsv", "hevc_qsv", "av1_qsv",
@@ -149,7 +146,7 @@ bool FFmpegDecoder::openCodec(AVCodecParameters* codecpar, AVCodecContext** code
             "h264_vdpau", "hevc_vdpau",
             nullptr
         };
-        
+
         for (int i = 0; hwDecoders[i]; i++) {
             const AVCodec* hwCodec = avcodec_find_decoder_by_name(hwDecoders[i]);
             if (hwCodec && hwCodec->id == codecpar->codec_id) {
@@ -158,11 +155,11 @@ bool FFmpegDecoder::openCodec(AVCodecParameters* codecpar, AVCodecContext** code
             }
         }
     }
-    
+
     if (!codec) {
         codec = avcodec_find_decoder(codecpar->codec_id);
     }
-    
+
     if (!codec) {
         return false;
     }
@@ -202,10 +199,10 @@ bool FFmpegDecoder::initHardwareDecoder(AVCodecContext* codecCtx, AVCodecParamet
 
 void FFmpegDecoder::close()
 {
-    if (m_decodeThread) {
-        m_decodeThread->quit();
-        m_decodeThread->wait();
-        m_decodeThread = nullptr;
+    stop();
+
+    if (m_decodeThread.joinable()) {
+        m_decodeThread.join();
     }
 
     if (m_swsCtx) {
@@ -256,16 +253,6 @@ void FFmpegDecoder::start()
     m_isPaused = false;
     m_isStopRequested = false;
 
-    if (!m_decodeThread) {
-        m_decodeThread = new QThread();
-        moveToThread(m_decodeThread);
-        connect(m_decodeThread, &QThread::started, this, &FFmpegDecoder::decodeLoop);
-        connect(m_decodeThread, &QThread::finished, m_decodeThread, &QThread::deleteLater);
-        m_decodeThread->start();
-    } else if (!m_decodeThread->isRunning()) {
-        m_decodeThread->start();
-    }
-
     m_mutex.lock();
     m_startTime = av_gettime() - m_currentPositionMs * 1000;
     m_mutex.unlock();
@@ -295,6 +282,10 @@ void FFmpegDecoder::stop()
     m_isPlaying = false;
     m_isPaused = false;
     m_waitCondition.wakeAll();
+
+    if (m_decodeThread.joinable()) {
+        m_decodeThread.join();
+    }
 }
 
 void FFmpegDecoder::seek(qint64 positionMs)
@@ -347,8 +338,8 @@ void FFmpegDecoder::decodeLoop()
     while (!m_isStopRequested) {
         m_mutex.lock();
         if (m_isPaused) {
-            m_waitCondition.wait(&m_mutex, 100);
             m_mutex.unlock();
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             continue;
         }
         m_mutex.unlock();
@@ -424,7 +415,7 @@ void FFmpegDecoder::decodeLoop()
         m_mutex.unlock();
 
         if (videoSize > 20 || (m_videoStreamIndex < 0 && audioSize > 30)) {
-            av_usleep(10000);
+            std::this_thread::sleep_for(std::chrono::microseconds(10000));
         }
     }
 
